@@ -77,7 +77,7 @@ Before pushing, run the manual verification gate (see `CLAUDE.md`): `node --chec
 
 Published by GitHub Pages from the `main` branch (root), and reverse-proxied under
 `mesonet.climate.umt.edu/maintenance/` by the mesonet_app Caddyfile and the
-[mesonet-edge](https://github.com/mt-climate-office/mesonet-edge) CloudFront
+[mesonet-gateway](https://github.com/mt-climate-office/mesonet-gateway) CloudFront
 distribution. **Pushing `main` is a production deploy.**
 
 ## History

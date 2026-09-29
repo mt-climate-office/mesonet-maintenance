@@ -41,7 +41,7 @@ not a console error, so re-check thumbnails after any CSP edit.
 Pushing `main` **is a production deploy, on two URLs**: GitHub Pages publishes
 the repo root from `main`, and the same page is reverse-proxied at
 `mesonet.climate.umt.edu/maintenance/` (mesonet_app Caddyfile on the legacy
-host; `pages_apps` in mesonet-edge terraform on the CloudFront host). The old
+host; `pages_apps` in mesonet-gateway terraform on the CloudFront host). The old
 `/api/v2/map/maintenance/` path 301s here from the mesonet-db-rds API.
 
 ## Verification
