@@ -1,0 +1,27 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.httr-oauth
+.DS_Store
+.quarto
+
+# Python bytecode
+__pycache__/
+
+# Ephemeral verification tooling (mco-web-style MIGRATING.md § verification).
+# Installed with `npm i --no-save playwright @axe-core/playwright`; never a
+# runtime dependency of the app.
+node_modules/
+package.json
+package-lock.json
+consumer-verify.mjs
+verify-out/
+
+
+# Synthetic API stand-ins for consumer-verify.mjs. Pages serves everything
+# committed, so fake station data must never land in git.
+fixtures/
+
+# Harness stdout capture from a background run.
+verify-out.log
