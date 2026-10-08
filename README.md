@@ -80,6 +80,22 @@ Published by GitHub Pages from the `main` branch (root), and reverse-proxied und
 [mesonet-gateway](https://github.com/mt-climate-office/mesonet-gateway) CloudFront
 distribution. **Pushing `main` is a production deploy.**
 
+`.github/workflows/preview.yml` runs nightly (and on manual dispatch) and **commits
+`assets/og-card.png` back to `main`** — always pull/rebase before pushing, or you race it.
+
+`scripts/generate_preview.py` screenshots the canonical URL at 2400×1260 (1800×945 at 4/3×, wide enough that the fitted zoom clears the z6 label threshold) with
+`?net=hydromet&labels=on&theme=light`, after the `#refresh-stamp` reads "loaded …" (both API reads landed). It
+refuses to overwrite the card when `#data-banner` shows (maintenance feed down). Those ids,
+the `net`/`labels`/`theme` parameters and the `mco-maint-seen-intro` key it pre-seeds to keep the help
+dialog closed are a contract — changing them silently breaks the social preview. Run it
+locally against your changes first:
+
+```bash
+pip install playwright
+playwright install --with-deps chromium
+python scripts/generate_preview.py
+```
+
 ## History
 
 This page was previously served by the legacy Mesonet API at `/api/v2/map/maintenance/`; its

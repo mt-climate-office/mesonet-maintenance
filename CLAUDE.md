@@ -44,6 +44,15 @@ the repo root from `main`, and the same page is reverse-proxied at
 host; `pages_apps` in mesonet-gateway terraform on the CloudFront host). The old
 `/api/v2/map/maintenance/` path 301s here from the mesonet-db-rds API.
 
+A nightly workflow (`.github/workflows/preview.yml`, 08:00 UTC) **commits
+`assets/og-card.png` to `main`**, so pull/rebase before pushing.
+`scripts/generate_preview.py` screenshots the canonical URL with
+`?net=hydromet&labels=on&theme=light`
+and depends on `#refresh-stamp` ("loaded …"), `#data-banner`, and the
+`mco-maint-seen-intro` localStorage key; rename any of them and the card
+silently breaks. Its waits must be locators, not `wait_for_function` strings —
+same no-`'unsafe-eval'` CSP as the harness.
+
 ## Verification
 
 There is no CI for the page. Before any push, run the manual gates from

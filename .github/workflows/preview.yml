@@ -1,0 +1,76 @@
+name: Update social preview image
+
+on:
+  schedule:
+    # 08:00 UTC = 01:00 MST / 02:00 MDT — overnight in Montana, so the card
+    # carries the previous day's visits.  The maintenance feed is a live
+    # AirTable read with no upstream batch to wait on, so the hour is arbitrary.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to commit assets/og-card.png back to the repo
+
+concurrency:
+  group: preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    name: Update social preview image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright + Chromium
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Generate preview image
+        run: python scripts/generate_preview.py
+
+      - name: Commit preview image
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # og-card.png is a regenerated, non-deterministic binary, so it can't
+          # be git-merged.  Instead of rebasing our commit onto origin/main
+          # (which produces an unresolvable binary conflict whenever origin has
+          # also updated the file), we always reset to the latest origin/main
+          # and re-apply our freshly generated file on top.  Retry if origin
+          # moves under us between fetch and push.
+          cp assets/og-card.png "$RUNNER_TEMP/og-card.png"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$RUNNER_TEMP/og-card.png" assets/og-card.png
+            git add assets/og-card.png
+
+            if git diff --staged --quiet; then
+              echo "Preview unchanged from origin/main; nothing to commit."
+              exit 0
+            fi
+
+            git commit -m "chore: update social preview image [skip ci]"
+
+            if git push; then
+              echo "Pushed preview update on attempt $attempt."
+              exit 0
+            fi
+
+            echo "Push rejected (attempt $attempt); origin/main moved, retrying…"
+            sleep 5
+          done
+
+          echo "Failed to push preview after 5 attempts." >&2
+          exit 1
