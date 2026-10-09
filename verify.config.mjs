@@ -54,7 +54,7 @@ export default {
   allowProblems: [],
   dialogOpener: '#btn-info',
   shortcuts: [{ key: '/', effect: () => document.activeElement?.id === 'search-input' }],
-  probes: async ({ open, check }) => {
+  probes: async ({ env, open, check }) => {
     // The map draws its data, not just the basemap.
     {
       const { page, close, problems } = await open('', { ready: dataReady, settleMs: 2500 });
@@ -69,6 +69,25 @@ export default {
       const n2 = await dotPixels(page);
       check(`station dots repaint after a theme flip (${n2} px)`, n2 > 300, String(n2));
       await close();
+    }
+    // CARTO down: watchBasemap falls back to a blank style with a notice,
+    // and the stations are re-added on that style.load and still draw.
+    // Chromium only: in Playwright's WebKit, ANY request interception
+    // (ctx.route or page.route) breaks MapLibre's blob: worker ("WebKitBlobResource
+    // error 1" -> "Worker failed to load"), so the map never loads there for
+    // reasons unrelated to the app.
+    if (env.engine === 'chromium') {
+      const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
+      await ctx.route(/basemaps\.cartocdn\.com\/gl\/.*style\.json/, (r) => r.abort());
+      const page = await ctx.newPage();
+      await page.goto(env.base + '?theme=dark');
+      await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
+      const notice = await page.waitForSelector('.mco-notice', { timeout: 30000 }).then(() => true, () => false);
+      await page.waitForTimeout(2500);
+      const n = await dotPixels(page);
+      check(`basemap failure: notice shown and stations still paint (${n} px)`, notice && n > 300, `notice=${notice} px=${n}`);
+      await ctx.close();
     }
     // Legend: click hides a category (and drops it from the map + URL);
     // Shift+Enter isolates.

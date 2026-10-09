@@ -137,12 +137,8 @@
     iconSun:  document.getElementById('icon-sun'),
     iconMoon: document.getElementById('icon-moon'),
     onChange: () => {
-      if (!map) { pushState(); return; }   // the library is still loading
-      map.setStyle(MCO.map.cartoStyleUrl());
-      map.once('style.load', () => {
-        addCustomLayers();   // re-add — setStyle wipes our sources/layers
-        rebuildSource();     // repopulate the now-empty stations source
-      });
+      // The every-style.load handler in wireMapLoad() re-adds our layers.
+      if (map) map.setStyle(MCO.map.cartoStyleUrl());
       pushState();
     },
   });
@@ -1275,8 +1271,20 @@
   function wireMapLoad() {
     zoomFloor = MCO.map.installZoomFloor(map);
 
-    map.on('load', () => {
+    // EVERY style.load, not once: the first style, each theme switch, and the
+    // blank fallback watchBasemap swaps in when CARTO fails all wipe our
+    // sources and layers. addCustomLayers is idempotent; rebuildSource
+    // refills the stations source from memory (a no-op before data lands).
+    map.on('style.load', () => {
       addCustomLayers();
+      rebuildSource();
+    });
+    // A basemap style that fails (or never answers) retries once, then falls
+    // back to a blank --bg-deep style with a notice, so the stations still
+    // draw instead of a white page.
+    MCO.map.watchBasemap(map);
+
+    map.on('load', () => {
       zoomFloor.refresh();
       _mapReady = true;
       // Kick off data fetch once layers exist, so rebuildSource never lands before its source.
