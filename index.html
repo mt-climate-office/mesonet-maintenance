@@ -43,9 +43,9 @@
   <!-- Favicons / app icons: hot-linked from the pinned kit tag (kit 0.9.0,
        decided 2026-10-08) so they version with the kit. img-src allows
        cdn.jsdelivr.net for them. The navbar logo stays vendored. -->
-  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/assets/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/assets/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/assets/apple-touch-icon.png">
 
   <!-- Open Graph (Facebook, LinkedIn, Slack, Discord, iMessage, etc.) -->
   <meta property="og:type"             content="website">
@@ -101,8 +101,8 @@
   <!-- House fonts: kit-hosted (mco-web-style 0.7.0), declared in mco-theme.css.
        Preloaded so the first frame is already in Outfit — no system-font flash.
        Same @version as the theme CSS; crossorigin is required on font preloads. -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
   <!-- MapLibre GL 6 (kit 0.8.0+): ES modules only, imported on demand by
        MCO.map.loadMapLibre(). The import map carries the SRI hashes and is ONE
        LINE, byte for byte from the kit snippet, so its CSP sha256 holds. -->
@@ -117,11 +117,11 @@
         integrity="sha384-ntw3zEt6rcVML7jDK0ULmHa5hxLB23afsPqzqfY+gLgMfAkbFCnCgPpkZvV5mmZX"
         crossorigin="anonymous">
 
-  <!-- mco-web-style @0.11.1 — tokens, reset, a11y utilities, navbar/panel/toast/
+  <!-- mco-web-style @0.11.2 — tokens, reset, a11y utilities, navbar/panel/toast/
        tooltip/modal shells, MapLibre control polish. Everything below in
        <style> is what remains app-specific after the kit took the rest. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/theme/mco-theme.css"
-        integrity="sha384-fgPQ77WorIiBcl64k4MazvEYd21g0lXRa8pDKCa+oUsOiQXHH8oY9FFuTWH6WyHv"
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/theme/mco-theme.css"
+        integrity="sha384-22H/4uZb4dmkrTZlLp4NJ4J+Wg39RNRIVIKO0x1HPYfyUWj81FA0fyM/uoRqbqme"
         crossorigin="anonymous">
 
   <style>
@@ -743,19 +743,19 @@
   <div class="lightbox-caption" id="lightbox-caption"></div>
 </dialog>
 
-<!-- mco-web-style @0.11.1 — classic scripts, so they must precede app.js.
+<!-- mco-web-style @0.11.2 — classic scripts, so they must precede app.js.
      MapLibre is not among them: mco-map.js imports it on demand
      (MCO.map.loadMapLibre). mco-palette.js precedes mco-map.js, whose
      markerPaint() reads it. SRI hashes are the kit README's table for this
      exact tag; bumping @version without recomputing them hard-fails in the
      browser, which is the point. -->
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/core/mco-core.js"
-        integrity="sha384-F/YeBkOPRU4+DPRf7McL88FjA76l+QnIEhFBUYDSrjBHcr4guZyDQvcG5x1VMjo/"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/core/mco-core.js"
+        integrity="sha384-b4r3+tK/yiZ4TNEllSsbDX3qW0NhcHDsF2iPzUWunUc2vNf1qlq9t9qo2YWgoZiK"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/palette/mco-palette.js"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/palette/mco-palette.js"
         integrity="sha384-P+8vdCR12oZ388lO/orPRnm6Tcz69x6mhN32l7AWP7j8S7KCNijXDZrmYjWuXm8J"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.1/map/mco-map.js"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/map/mco-map.js"
         integrity="sha384-tmDqtqi4yYiDHOxkZikwzXF3Lpkb63b0Tu6K7jeCpU9gJkPB2GbpFHLasGHka6zP"
         crossorigin="anonymous"></script>
 
