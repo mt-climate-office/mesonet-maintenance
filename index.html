@@ -238,11 +238,13 @@
     .pop-pill.new       { background: var(--c-new);      color: #1a1a2e; }  /* 7.03:1 */
     .pop-pill.as_needed { background: var(--c-asneeded); color: #1a1a2e; }  /* 4.93:1 */
     .pop-pill.nodata    { background: var(--c-nodata);   color: #1a1a2e; }  /* 6.71:1 */
+    /* Label/value pairs are the kit's .mco-facts. A state that needs a
+       sentence instead ("AgriMet station — visited as needed…") gets this
+       note. It is plain text on the popup surface, not --text-muted on a
+       raised box. */
     .pop-summary {
-      margin-top: 8px; padding: 6px 8px; background: var(--bg-raised); border-radius: var(--radius-sm);
-      font-size: 0.74rem; color: var(--text-secondary); line-height: 1.45;
+      margin: 8px 0 0; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.45;
     }
-    .pop-summary strong { color: var(--text-primary); font-weight: 600; }
     .pop-section-title {
       margin-top: 11px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.07em;
       text-transform: uppercase; color: var(--text-muted);

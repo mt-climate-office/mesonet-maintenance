@@ -1154,11 +1154,18 @@
     if (ph) item.appendChild(ph);
     return item;
   }
-  // "Label: <strong>value</strong> (rel)" — a line of the summary box.
-  function summaryLine(parent, label, value, rel) {
-    parent.append(label, el('strong', null, value));
-    if (rel) parent.append(` (${rel})`);
+  // Label/value pairs as the kit's .mco-facts <dl> (0.9.0), the same markup
+  // MCO.map.popupContent emits, so the popup and the sheet read alike.
+  function factsEl(pairs) {
+    const dl = el('dl', 'mco-facts');
+    for (const [k, v] of pairs) {
+      const row = el('div');
+      row.append(el('dt', null, k), el('dd', null, v));
+      dl.appendChild(row);
+    }
+    return dl;
   }
+  const withRel = (iso) => `${fmtDate(iso)} (${relDays(iso)})`;
   function stationBodyEl(stationId) {
     const s = stationById.get(stationId);
     const m = maintBySta.get(stationId) || null;
@@ -1166,7 +1173,7 @@
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
     const body = document.createDocumentFragment();
 
-    // [data-peek]: what the bottom sheet's peek detent shows (pill + summary).
+    // [data-peek]: what the bottom sheet's peek detent shows (pill + facts).
     const peek = el('div');
     peek.dataset.peek = '';
     body.appendChild(peek);
@@ -1174,30 +1181,27 @@
     pillRow.appendChild(el('span', `pop-pill ${pill.cls}`, pill.lbl));
     peek.appendChild(pillRow);
 
-    const summary = el('div', 'pop-summary');
+    // Facts where there are values; a prose note where the state needs one.
+    const facts = [];
+    let note = null;
     if (dataUnavailable) {
-      summary.textContent = 'Maintenance data is currently unavailable.';
+      note = 'Maintenance data is currently unavailable.';
     } else if (state === 'new') {
-      summary.append('Installed this year — not yet due for its annual ', el('strong', null, 'Maintenance'), ' visit.');
+      note = 'Installed this year — not yet due for its annual Maintenance visit.';
     } else if (state === 'as_needed') {
-      if (m && m.last_qualifying_visit_date) {
-        summaryLine(summary, 'Last Maintenance: ', fmtDate(m.last_qualifying_visit_date), relDays(m.last_qualifying_visit_date));
-        summary.appendChild(el('br'));
-      } else if (m && m.last_visit_date) {
-        summaryLine(summary, 'Last visit of any type: ', fmtDate(m.last_visit_date), relDays(m.last_visit_date));
-        summary.appendChild(el('br'));
-      }
-      summary.append('AgriMet station — visited as needed, not subject to the annual Maintenance requirement.');
+      if (m && m.last_qualifying_visit_date) facts.push(['Last Maintenance', withRel(m.last_qualifying_visit_date)]);
+      else if (m && m.last_visit_date) facts.push(['Last visit (any type)', withRel(m.last_visit_date)]);
+      note = 'AgriMet station — visited as needed, not subject to the annual Maintenance requirement.';
     } else if (m && m.last_qualifying_visit_date) {
-      summaryLine(summary, 'Last Maintenance: ', fmtDate(m.last_qualifying_visit_date), relDays(m.last_qualifying_visit_date));
-      summary.appendChild(el('br'));
       const n = m.qualifying_visits_this_year;
-      summary.append(el('strong', null, String(n)), ` Maintenance visit${n === 1 ? '' : 's'} this year`);
+      facts.push(['Last Maintenance', withRel(m.last_qualifying_visit_date)]);
+      facts.push(['This year', `${n} Maintenance visit${n === 1 ? '' : 's'}`]);
     } else {
-      summary.append('No ', el('strong', null, 'Maintenance'), ' visit on record' +
-        (m && m.last_visit_date ? ` (last visit of any type ${fmtDate(m.last_visit_date)})` : '') + '.');
+      note = 'No Maintenance visit on record.';
+      if (m && m.last_visit_date) facts.push(['Last visit (any type)', fmtDate(m.last_visit_date)]);
     }
-    peek.appendChild(summary);
+    if (facts.length) peek.appendChild(factsEl(facts));
+    if (note) peek.appendChild(el('p', 'pop-summary', note));
 
     if (m && m.visits && m.visits.length) {
       body.appendChild(el('div', 'pop-section-title', 'Visits'));
