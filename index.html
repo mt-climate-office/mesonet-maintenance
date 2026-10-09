@@ -489,6 +489,18 @@
      rebuilt on every repaint) is MCO.srTable's, appended here by app.js. -->
 </main>
 
+<!-- Station detail on compact viewports (MCO.initSheet); app.js fills it.
+     Outside <main> so its full detent can make <main> and the navbar inert
+     while the dialogs stay live. -->
+<section class="mco-sheet" id="station-sheet" aria-labelledby="station-sheet-title" data-state="closed" hidden>
+  <div class="mco-sheet-head">
+    <button type="button" class="mco-sheet-grip" aria-label="Expand details" aria-expanded="false"></button>
+    <h2 class="mco-sheet-title" id="station-sheet-title" tabindex="-1">Station</h2>
+    <button type="button" class="modal-close" data-close-sheet aria-label="Close">×</button>
+  </div>
+  <div class="mco-sheet-body"></div>
+</section>
+
 <!-- Tooltip is purely visual: anchored to cursor, no focusable trigger, so it
      would never be surfaced to a screen reader. SR notifications go through
      MCO.announce, whose live region the kit creates. The kit also creates and

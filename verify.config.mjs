@@ -65,7 +65,7 @@ export default {
     { name: 'empty-state', query: '?cat-compliance=', ready: () => dataReady() && !document.getElementById('empty-state').hidden },
     // A station popup open (visit history, pills, photos, links): it only
     // exists after a click, so a load-only scan never audits it.
-    { name: 'station-popup', query: '?station=aceashla&lng=-106.41&lat=45.6&zoom=9', ready: () => !!document.querySelector('.maplibregl-popup .visit-photo-thumb') },
+    { name: 'station-popup', query: '?station=aceashla&lng=-106.41&lat=45.6&zoom=9', ready: () => !!document.querySelector('.maplibregl-popup .visit-photo-thumb, #station-sheet:not([hidden]) .visit-photo-thumb') },
   ],
   exemptTargets: '',
   allowProblems: [],
@@ -169,6 +169,32 @@ export default {
       await page.keyboard.press('Enter');
       const opened = await page.waitForFunction(() => /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), null, { timeout: 15000 }).then(() => true, () => false);
       check(`search lists matches (${opts}) and Enter opens that station`, opts > 0 && opened);
+      await close();
+    }
+    // Compact: a station opens the bottom sheet (peek), the grip takes it to
+    // full (modal: <main> inert), the lightbox still works from it, and Esc
+    // closes it and drops ?station=.
+    {
+      const { page, close } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      const peek = await page.waitForSelector('#station-sheet[data-state="peek"]', { timeout: 15000 }).then(() => true, () => false);
+      const noPopup = await page.locator('.maplibregl-popup').count() === 0;
+      const title = await page.evaluate(() => [document.getElementById('station-sheet-title').textContent, document.activeElement?.id]);
+      check('compact deep link opens the sheet at peek (no anchored popup), focus on its title', peek && noPopup && title[0] === 'Ashland' && title[1] === 'station-sheet-title', JSON.stringify({ peek, noPopup, title }));
+      await page.locator('#station-sheet .mco-sheet-grip').focus();
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(500);
+      const full = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, inert: document.getElementById('main').inert }));
+      check('grip Enter -> full detent, <main> inert', full.st === 'full' && full.inert, JSON.stringify(full));
+      await page.locator('#station-sheet .visit-photo-thumb').first().click();
+      const lb = await page.waitForFunction(() => document.getElementById('lightbox').open && document.getElementById('lightbox-img').naturalWidth > 0, null, { timeout: 15000 }).then(() => true, () => false);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      const after1 = await page.evaluate(() => ({ lb: document.getElementById('lightbox').open, st: document.getElementById('station-sheet').dataset.state }));
+      check('lightbox opens from the full sheet; its Esc closes only the lightbox', lb && !after1.lb && after1.st === 'full', JSON.stringify({ lb, ...after1 }));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+      const after = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search, inert: document.getElementById('main').inert }));
+      check('Esc closes the sheet, un-inerts <main>, drops ?station=', after.st === 'closed' && !after.inert && !/station=/.test(after.q), JSON.stringify(after));
       await close();
     }
     // Deep link opens the popup, and its visit photos actually load.

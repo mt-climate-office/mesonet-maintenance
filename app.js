@@ -1166,9 +1166,13 @@
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
     const body = document.createDocumentFragment();
 
+    // [data-peek]: what the bottom sheet's peek detent shows (pill + summary).
+    const peek = el('div');
+    peek.dataset.peek = '';
+    body.appendChild(peek);
     const pillRow = el('div');
     pillRow.appendChild(el('span', `pop-pill ${pill.cls}`, pill.lbl));
-    body.appendChild(pillRow);
+    peek.appendChild(pillRow);
 
     const summary = el('div', 'pop-summary');
     if (dataUnavailable) {
@@ -1193,7 +1197,7 @@
       summary.append('No ', el('strong', null, 'Maintenance'), ' visit on record' +
         (m && m.last_visit_date ? ` (last visit of any type ${fmtDate(m.last_visit_date)})` : '') + '.');
     }
-    body.appendChild(summary);
+    peek.appendChild(summary);
 
     if (m && m.visits && m.visits.length) {
       body.appendChild(el('div', 'pop-section-title', 'Visits'));
@@ -1207,10 +1211,11 @@
   // The station detail as DOM: the kit's popup shell (title, mono subtitle,
   // dashboard action through safeUrl) with this map's visit history inside.
   // No API string ever reaches setHTML/innerHTML (HOUSE-STYLE §7).
-  function stationContent(stationId) {
+  // withTitle false: the sheet carries the name in its own <h2>.
+  function stationContent(stationId, withTitle = true) {
     const s = stationById.get(stationId);
     const frag = MCO.map.popupContent({
-      title: s.name || stationId,
+      title: withTitle ? (s.name || stationId) : null,
       subtitle: `${stationId}${s.sub_network ? ` · ${s.sub_network}` : ''}`,
       actions: [{ label: 'Open dashboard →', href: DASH_URL(stationId) }],
     });
@@ -1219,11 +1224,48 @@
     return frag;
   }
 
+  // ── Compact: the bottom sheet instead of the anchored popup ──────────────
+  // On a phone an anchored 340px popup covers most of the map and the visit
+  // history scrolls inside it. MCO.initSheet (kit 0.9.0) gives peek (pill +
+  // summary) and full detents, drag and its keyboard twin, focus to the
+  // title and back to the opener, and modality only in the full detent. The
+  // two dialogs stay live: a thumb in the sheet opens the lightbox.
+  const sheetEl = document.getElementById('station-sheet');
+  const sheetTitleEl = document.getElementById('station-sheet-title');
+  const sheetBodyEl = sheetEl.querySelector('.mco-sheet-body');
+  let _sheetOpen = false;
+  let _suppressSheetClose = false;
+  const stationSheet = MCO.initSheet({
+    sheet: sheetEl,
+    peekHeight: 'auto',
+    inertRoots: MCO.overlay.siblingsOf(sheetEl, [infoModal, document.getElementById('lightbox')]),
+    fallbackFocus: document.getElementById('map'),
+    onState: (st) => {
+      if (st !== 'closed') { _sheetOpen = true; return; }
+      _sheetOpen = false;
+      if (_suppressSheetClose) { _suppressSheetClose = false; return; }
+      if (_selectedStation) { _selectedStation = null; pushState(); }
+    },
+  });
+  function openSheetFor(stationId) {
+    const s = stationById.get(stationId);
+    sheetTitleEl.textContent = s.name || stationId;
+    sheetBodyEl.replaceChildren(stationContent(stationId, false));
+    stationSheet.open('peek');
+  }
+
   function openPopupFor(stationId, lngLat) {
     const s = stationById.get(stationId);
     if (!s) return;
     if (_popup) { _suppressNextPopupClose = true; _popup.remove(); _popup = null; }
     _selectedStation = stationId;
+    if (MCO.viewport.isCompact()) {
+      openSheetFor(stationId);
+      announcePopup(stationId);
+      pushState();
+      return;
+    }
+    if (_sheetOpen) { _suppressSheetClose = true; stationSheet.close({ restoreFocus: false }); }
     const p = new maplibregl.Popup({ closeOnClick: false, maxWidth: '340px', offset: 12 })
       .setLngLat(lngLat || [s.longitude, s.latitude])
       .setDOMContent(stationContent(stationId))
@@ -1402,6 +1444,7 @@
   // (so we don't pushState for an open-replace; the new popup pushes its own state).
   let _suppressNextPopupClose = false;
   function closePopup() {
+    if (_sheetOpen) { stationSheet.close(); return; }   // onState clears the selection
     if (!_popup) return;
     _suppressNextPopupClose = true;
     _popup.remove();
@@ -1520,6 +1563,9 @@
   // Global keyboard shortcuts: ESC closes things; / focuses search.
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      // An open dialog (lightbox, info) owns this Esc; the sheet's own Esc is
+      // handled by the kit's overlay stack.
+      if (document.querySelector('dialog[open]') || e.defaultPrevented) return;
       closeSpider();
       closePopup();
       return;
