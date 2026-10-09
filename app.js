@@ -829,24 +829,37 @@
   // since hidden-network stations never reach `features`. Rebuilt silently: it
   // is deliberately NOT wired to a live region, because re-announcing the whole
   // table on every repaint would be noise.
+  // MCO.srTable (kit 0.8.0): the wrapper div carries .sr-only, not the
+  // <table>. The old hand-built table had .sr-only on the <table> itself,
+  // which a table ignores for sizing: it laid out ~614px wide, and on a
+  // mobile browser that widened the layout viewport past the screen.
+  const srTwin = MCO.srTable({
+    container: document.getElementById('main'),
+    caption: 'Mesonet stations and their maintenance-visit status',
+    columns: [
+      { key: 'name', label: 'Station', rowHeader: true },
+      { key: 'station', label: 'ID' },
+      { key: 'net', label: 'Sub-network' },
+      { key: 'status', label: 'Status' },
+      { key: 'last', label: 'Last visit' },
+    ],
+    rowKey: (r) => r.station,
+  });
+  srTwin.element.id = 'sr-station-table';
   function rebuildSrTable(features) {
-    const tbody = document.getElementById('sr-station-rows');
-    if (!tbody) return;
     const rows = features
-      .slice()
-      .sort((a, b) => a.properties.name.localeCompare(b.properties.name))
       .map((f) => {
         const p = f.properties;
         const m = maintBySta.get(p.station);
         const pill = STATE_PILL[p.complianceState] || STATE_PILL.nodata;
-        const last = m && m.last_visit_date ? fmtDate(m.last_visit_date) : '—';
-        return `<tr><td>${MCO.escapeHTML(p.name)}</td>`
-             + `<td>${MCO.escapeHTML(p.station)}</td>`
-             + `<td>${MCO.escapeHTML(p.sub_network || '—')}</td>`
-             + `<td>${MCO.escapeHTML(pill.lbl)}</td>`
-             + `<td>${MCO.escapeHTML(last)}</td></tr>`;
-      });
-    tbody.innerHTML = rows.join('');
+        return {
+          name: p.name, station: p.station, net: p.sub_network,
+          status: pill.lbl,
+          last: m && m.last_visit_date ? fmtDate(m.last_visit_date) : null,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    srTwin.render(rows);
   }
 
   // ── Sub-network filter UI (chip toggles in navbar) ───────────────────────

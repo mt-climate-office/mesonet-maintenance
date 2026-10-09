@@ -457,7 +457,7 @@
 
 <main id="main" tabindex="-1">
 <div id="map-container">
-  <div id="map" role="application" aria-label="Mesonet station maintenance map"></div>
+  <div id="map" role="application" aria-label="Mesonet station maintenance map. The data is in the table that follows."></div>
   <!-- #data-banner: an MCO.notice app.js adds here when the maintenance
        feed fails or returns nothing (setDataNotice). -->
   <!-- Centered message overlay; shown when no stations match the active filters. -->
@@ -485,20 +485,8 @@
   </aside>
 </div>
 
-<!-- Screen-reader twin of the map canvas: one row per visible station, rebuilt
-     on every repaint. WebGL output is invisible to assistive tech, so this
-     table is the only way the maintenance status is readable without sight. -->
-<table id="sr-station-table" class="sr-only">
-  <caption>Mesonet stations and their maintenance-visit status</caption>
-  <thead>
-    <tr>
-      <th scope="col">Station</th><th scope="col">ID</th>
-      <th scope="col">Sub-network</th><th scope="col">Status</th>
-      <th scope="col">Last visit</th>
-    </tr>
-  </thead>
-  <tbody id="sr-station-rows"></tbody>
-</table>
+<!-- The screen-reader twin of the map canvas (one row per visible station,
+     rebuilt on every repaint) is MCO.srTable's, appended here by app.js. -->
 </main>
 
 <!-- Tooltip is purely visual: anchored to cursor, no focusable trigger, so it

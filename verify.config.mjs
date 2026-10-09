@@ -19,7 +19,7 @@
    is an empty box, not a console error. */
 import { load } from '../mco-web-style/tools/verify/lib.mjs';
 
-const dataReady = () => document.querySelectorAll('#sr-station-rows tr').length > 100;
+const dataReady = () => document.querySelectorAll('#sr-station-table tbody tr').length > 100;
 
 // Compliance-mode dot colors (app.js MODES): visited and overdue.
 const DOT_RGB = [[0x2a, 0x8a, 0x86], [0xb8, 0x42, 0x1b]];
@@ -150,7 +150,7 @@ export default {
       const st = await page.evaluate(() => ({
         pressed: document.querySelector('#legend-rows [data-key="as_needed"]').getAttribute('aria-pressed'),
         q: location.search,
-        rows: document.querySelectorAll('#sr-station-rows tr').length,
+        rows: document.querySelectorAll('#sr-station-table tbody tr').length,
       }));
       check('legend click hides a category (aria-pressed=false, cat- in URL)', st.pressed === 'false' && /cat-compliance=/.test(st.q), JSON.stringify(st));
       await page.locator('#legend-rows [data-key="visited"]').focus();
