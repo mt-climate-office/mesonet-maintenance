@@ -7,7 +7,7 @@ the API and the CDN-pinned libraries in `index.html`.
 ## House style
 
 This app consumes mco-web-style (pinned + SRI in `index.html`; currently
-**v0.7.1** — check the tag in that file rather than trusting this line). Design
+**v0.11.2** — check the tag in that file rather than trusting this line). Design
 tokens, a11y mandates, and interaction conventions: see HOUSE-STYLE.md in
 https://github.com/mt-climate-office/mco-web-style — tokens only (no raw hexes),
 `--accent` is fill-only, `aria-pressed` drives toggle styling, canvas data needs
@@ -57,13 +57,21 @@ same no-`'unsafe-eval'` CSP as the harness.
 
 There is no CI for the page. Before any push, run the manual gates from
 mco-web-style `MIGRATING.md` § "Verification recipe": `node --check app.js`,
-`npx html-validate@9 index.html`, and the app's `consumer-verify.mjs` harness
-(untracked; install `playwright` + `@axe-core/playwright` with `--no-save`).
+`npx html-validate@9 index.html`, and the kit's `tools/verify/` harness from a
+kit checkout beside this repo, driven by the committed `verify.config.mjs`:
 
-The harness serves the repo root on a local port and intercepts the two API URLs
-in the browser (`ctx.route`) to answer them from `fixtures/` — also untracked,
-because Pages serves everything committed and fake station data must never be
-public. The generator is in the harness header comment; captures of the live
-endpoints (`curl` with `?type=json`) work too. `renderEvidence` must be a
-**function**, not a string: a string is `eval`'d in-page and the CSP has no
-`'unsafe-eval'`.
+    cd ../mco-web-style
+    node tools/verify/head.mjs       --root ../mesonet-maintenance
+    node tools/verify/axe-matrix.mjs --config ../mesonet-maintenance/verify.config.mjs
+    node tools/verify/keyboard.mjs   --config ../mesonet-maintenance/verify.config.mjs
+
+They run Chromium AND WebKit against the live API. The config's probes prove
+the map draws its data (canvas pixels in the dot colors, before and after a
+theme flip) and that a station popup's AirTable photos load. `ready` must be
+a **function**, not a string: a string is `eval`'d in-page and the CSP has no
+`'unsafe-eval'`. (The older untracked `consumer-verify.mjs` + `fixtures/`
+harness still works for offline runs.)
+
+MapLibre 6 is an ES module the kit imports (`MCO.map.loadMapLibre()`); the map
+is built in `initMap()` once it resolves, so code that runs before then must
+tolerate `map === null`.
