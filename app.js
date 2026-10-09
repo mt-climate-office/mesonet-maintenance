@@ -109,15 +109,15 @@
   const infoModal     = document.getElementById('info-modal');
   const dataBannerEl  = document.getElementById('data-banner');
 
-  // Push a sentence to the aria-live region so screen-reader users hear
-  // "Station X opened" when a popup is shown via click, search, or deep-link.
-  const srAnnounceEl = document.getElementById('sr-announce');
+  // Tell screen-reader users which station opened when a popup is shown via
+  // click, search, or deep-link. MCO.announce (kit 0.8.0) owns the polite
+  // live region, its clear-then-set (so a repeat is re-read) and de-dupe.
   function announcePopup(stationId) {
     const s = stationById.get(stationId);
-    if (!s || !srAnnounceEl) return;
+    if (!s) return;
     const state = complianceStateFor(s);
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
-    srAnnounceEl.textContent = `${s.name} (${s.station}), ${s.sub_network || 'station'}, ${pill.lbl}.`;
+    MCO.announce(`${s.name} (${s.station}), ${s.sub_network || 'station'}, ${pill.lbl}.`);
   }
 
   // ── Theme ────────────────────────────────────────────────────────────────

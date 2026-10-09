@@ -584,11 +584,10 @@
 </main>
 
 <!-- Tooltip is purely visual: anchored to cursor, no focusable trigger, so it
-     would never be surfaced to a screen reader. The aria-live #sr-announce
-     region below covers SR notifications. The toast element is gone — the kit
-     creates and owns its own (.mco-toast) on first MCO.showToast() call. -->
+     would never be surfaced to a screen reader. SR notifications go through
+     MCO.announce, whose live region the kit creates. The kit also creates and
+     owns the toast (.mco-toast) on first MCO.showToast() call. -->
 <div id="tooltip" class="mco-tooltip" aria-hidden="true"></div>
-<div id="sr-announce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
 <dialog id="info-modal" class="mco-modal" aria-labelledby="info-modal-title">
   <div class="info-modal-box">
