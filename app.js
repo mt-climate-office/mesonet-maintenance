@@ -147,11 +147,14 @@
     button:   document.getElementById('btn-theme'),
     iconSun:  document.getElementById('icon-sun'),
     iconMoon: document.getElementById('icon-moon'),
-    onChange: () => {
-      // The every-style.load handler in wireMapLoad() re-adds our layers.
-      if (map) map.setStyle(MCO.map.cartoStyleUrl());
-      writeUrl();
-    },
+  });
+  // React to the theme however it changed (this button, or any other
+  // MCO.setTheme caller): the kit's mco:themechange event (0.9.0), not the
+  // toggle's onChange. The every-style.load handler in wireMapLoad() re-adds
+  // our layers and re-samples the ramp colors for the new theme.
+  document.addEventListener('mco:themechange', () => {
+    if (map) map.setStyle(MCO.map.cartoStyleUrl());
+    writeUrl();
   });
 
   // ── Info modal ───────────────────────────────────────────────────────────
