@@ -141,21 +141,6 @@
       --c-asneeded: #7a8ba6;  /* slate — AgriMet, as-needed */
       --c-nodata:   #9aa3b3;  /* grey — no data */
       --c-new:      #5aaee8;  /* blue — installed this year, exempt */
-      /* Amber: the data-unavailable banner's accent. 7.8:1 on #161b22. */
-      --c-warn:     #e0a32e;
-      --warn-bg:    rgba(224,163,46,0.14);
-    }
-    [data-theme="light"] {
-      /* Darkened from the dark-theme amber, which is only 2.2:1 on the light
-         navbar glass. #7d5a0e is 6.2:1 there and 5.6:1 on --bg-deep. */
-      --c-warn:     #7d5a0e;
-      --warn-bg:    rgba(176,120,20,0.12);
-    }
-    [data-theme="high-contrast"] {
-      /* 14.6:1 on #000000; the dark-theme amber is 9.5:1, which clears AAA but
-         reads as the dim one beside this theme's other accents. */
-      --c-warn:     #ffd166;
-      --warn-bg:    rgba(255,209,102,0.18);
     }
 
     /* ── Navbar (app-specific remainder) ───────────────────────────────────
@@ -205,15 +190,6 @@
       display: flex; align-items: center; gap: 10px;
     }
     .empty-state-card strong { color: var(--text-primary); font-weight: 600; }
-
-    /* Data-unavailable banner — shown when the maintenance fetch fails/empty. */
-    #data-banner {
-      position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-      z-index: calc(var(--z-map-notice) + 1); max-width: calc(100% - 32px);
-    }
-    #data-banner[hidden] { display: none; }
-    #data-banner .empty-state-card { background: var(--warn-bg); border-color: var(--c-warn); }
-    #data-banner strong { color: var(--text-primary); }
 
     /* ── Search (the kit's .mco-search, MCO.initSearchBox) ────────────────
        Field, icon and listbox are kit-owned. Only the "/" hint is this map's. */
@@ -498,10 +474,8 @@
 <main id="main" tabindex="-1">
 <div id="map-container">
   <div id="map" role="application" aria-label="Mesonet station maintenance map"></div>
-  <!-- Shown when the maintenance fetch fails or returns nothing. -->
-  <div id="data-banner" hidden role="status" aria-live="polite">
-    <div class="empty-state-card"><strong>Maintenance data unavailable.</strong>&nbsp;Showing stations without visit status — try Refresh.</div>
-  </div>
+  <!-- #data-banner: an MCO.notice app.js adds here when the maintenance
+       feed fails or returns nothing (setDataNotice). -->
   <!-- Centered message overlay; shown when no stations match the active filters. -->
   <div id="empty-state" hidden role="status" aria-live="polite"></div>
 

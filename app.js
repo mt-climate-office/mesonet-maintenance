@@ -107,7 +107,7 @@
   const searchInput   = document.getElementById('search-input');
   const searchList    = document.getElementById('search-dropdown');
   const infoModal     = document.getElementById('info-modal');
-  const dataBannerEl  = document.getElementById('data-banner');
+  const mapContainerEl = document.getElementById('map-container');
 
   // Tell screen-reader users which station opened when a popup is shown via
   // click, search, or deep-link. MCO.announce (kit 0.8.0) owns the polite
@@ -660,7 +660,7 @@
       const maint = Array.isArray(maintRaw) ? maintRaw : [];
       dataUnavailable = maint.length === 0;
       maintBySta = new Map(maint.map(m => [m.station, m]));
-      dataBannerEl.hidden = !dataUnavailable;
+      setDataNotice(dataUnavailable);
 
       indexStations();
       buildFilterUI();
@@ -686,7 +686,7 @@
     } catch (err) {
       console.error(err);
       dataUnavailable = true;
-      dataBannerEl.hidden = false;
+      setDataNotice(true);
       MCO.showToast(`Error loading data: ${err.message}`);
       // Still try to render whatever we have.
       indexStations();
@@ -696,6 +696,27 @@
       applyAllFilters();
       renderLegend();
       MCO.ready();
+    }
+  }
+  // Maintenance feed down or empty: a warning notice over the map, with
+  // Retry (MCO.notice, kit 0.8.0 — tone word, icon, announcement, dismiss).
+  // The element keeps the id "data-banner": scripts/generate_preview.py
+  // refuses to overwrite the social card while it is visible.
+  let _dataNotice = null;
+  function setDataNotice(on) {
+    if (on && !_dataNotice) {
+      _dataNotice = MCO.notice({
+        tone: 'warning',
+        text: 'Maintenance data unavailable. Showing stations without visit status.',
+        action: { label: 'Retry', onClick: () => refreshData() },
+        container: mapContainerEl, place: 'over',
+        onClose: () => { _dataNotice = null; },
+      });
+      if (_dataNotice.element) _dataNotice.element.id = 'data-banner';
+    } else if (!on && _dataNotice) {
+      const n = _dataNotice;
+      _dataNotice = null;
+      n.close();
     }
   }
   // Only re-consume the deep-link once (initial load); Refresh shouldn't refly.
@@ -1515,13 +1536,14 @@
   }
 
   // ── Refresh (manual data reload) ─────────────────────────────────────────
-  document.getElementById('btn-refresh').addEventListener('click', () => {
-    // Don't refly to the deep-linked station on a manual refresh.
-    if (_initStationConsumed) { /* deep link already handled */ }
+  // (A manual refresh doesn't refly to the deep-linked station: loadAll
+  // consumes ?station= only on the first load.)
+  function refreshData() {
     if (!_mapReady) return;   // the map's load handler runs the first fetch
     refreshStampEl.textContent = 'loading…';
     loadAll();
-  });
+  }
+  document.getElementById('btn-refresh').addEventListener('click', refreshData);
 
   // ── Labels toggle ────────────────────────────────────────────────────────
   let labelsOn = (() => {

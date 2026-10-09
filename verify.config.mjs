@@ -113,6 +113,31 @@ export default {
       check(`basemap failure: notice shown and stations still paint (${n} px)`, notice && n > 300, `notice=${notice} px=${n}`);
       await ctx.close();
     }
+    // Maintenance feed empty: the warning notice (#data-banner, which the
+    // social-card generator checks) appears over the map with Retry, and the
+    // stations still list. Chromium only, for the same reason as above.
+    if (env.engine === 'chromium') {
+      const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
+      await ctx.route(/\/stations\/maintenance\/live/, (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }));
+      const page = await ctx.newPage();
+      await page.goto(env.base + '?theme=light');
+      await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
+      const st = await page.evaluate(() => {
+        const b = document.getElementById('data-banner');
+        return { vis: !!b && b.offsetParent !== null, text: b?.textContent || '', retry: !!b?.querySelector('.mco-notice-actions button') };
+      });
+      check('empty maintenance feed: #data-banner warning notice with Retry', st.vis && /Warning/.test(st.text) && st.retry, JSON.stringify(st));
+      const { AxeBuilder } = await load('@axe-core/playwright');
+      for (const theme of ['light', 'dark', 'high-contrast']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+        await page.waitForTimeout(800);   // let color transitions finish
+        const r = await new AxeBuilder({ page }).include('#data-banner').analyze();
+        const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+        check(`#data-banner axe-clean in ${theme}`, bad.length === 0, bad.map((v) => v.id).join(','));
+      }
+      await ctx.close();
+    }
     // Legend: click hides a category (and drops it from the map + URL);
     // Shift+Enter isolates.
     {

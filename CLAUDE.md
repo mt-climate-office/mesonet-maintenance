@@ -48,7 +48,8 @@ A nightly workflow (`.github/workflows/preview.yml`, 08:00 UTC) **commits
 `assets/og-card.png` to `main`**, so pull/rebase before pushing.
 `scripts/generate_preview.py` screenshots the canonical URL with
 `?net=hydromet&labels=on&theme=light`
-and depends on `#refresh-stamp` ("loaded …"), `#data-banner`, and the
+and depends on `#refresh-stamp` ("loaded …"), `#data-banner` (an `MCO.notice`
+whose element app.js gives that id; present only while the feed is down), and the
 `mco-maint-seen-intro` localStorage key; rename any of them and the card
 silently breaks. Its waits must be locators, not `wait_for_function` strings —
 same no-`'unsafe-eval'` CSP as the harness.
