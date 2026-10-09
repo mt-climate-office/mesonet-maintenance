@@ -365,26 +365,6 @@
     @media (hover: none) { .visit-photo-thumb { width: 52px; height: 52px; } .lightbox-nav { font-size: 2.4rem; } }
 
 
-    /* ── Tooltip (app-specific lines) ───────────────────────────────────────
-       The kit owns .mco-tooltip and its .tooltip-name / .tooltip-sub. It also
-       ships .tooltip-val — but that is a monospace, accent-colored VALUE line
-       ("42°F"), and what this map needs is a prose status line. Restoring the
-       two classes the kit does not own; without them these lines lose their
-       display:block and collapse onto one row. */
-    .mco-tooltip .tooltip-line {
-      display: block;
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-      margin-top: 3px;
-    }
-    .mco-tooltip .tooltip-rel {
-      display: block;
-      font-size: 0.7rem;
-      color: var(--accent-line);
-      font-weight: 500;
-      margin-top: 1px;
-    }
-
     /* ── Responsive ────────────────────────────────────────────────────────── */
     /* The kit owns the ladder above this: the ≤1400px button-label shed and the
        ≤750px collapse of the brand lockup to the logo badge (title and subtitle

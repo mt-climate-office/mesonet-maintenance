@@ -24,6 +24,21 @@ const dataReady = () => document.querySelectorAll('#sr-station-rows tr').length 
 // Compliance-mode dot colors (app.js MODES): visited and overdue.
 const DOT_RGB = [[0x2a, 0x8a, 0x86], [0xb8, 0x42, 0x1b]];
 
+// First pixel (in page coordinates) in a dot color, or null.
+async function findDot(page) {
+  const { PNG } = await load('pngjs');
+  const box = await page.locator('#map').boundingBox();
+  const png = PNG.sync.read(await page.screenshot({ clip: box }));
+  const [R, G, B] = DOT_RGB[0];
+  for (let y = 60; y < png.height - 60; y += 2) for (let x = 340; x < png.width - 80; x += 2) {
+    const i = (y * png.width + x) * 4;
+    if (Math.abs(png.data[i] - R) + Math.abs(png.data[i + 1] - G) + Math.abs(png.data[i + 2] - B) < 12) {
+      return { x: box.x + x + 2, y: box.y + y + 2 };
+    }
+  }
+  return null;
+}
+
 async function dotPixels(page) {
   const { PNG } = await load('pngjs');
   const box = await page.locator('#map').boundingBox();
@@ -60,6 +75,15 @@ export default {
       const { page, close, problems } = await open('', { ready: dataReady, settleMs: 2500 });
       const n = await dotPixels(page);
       check(`station dots paint on the canvas (${n} px in data colors)`, n > 300, String(n));
+      // Hover a dot: the cursor tooltip names the station and its status.
+      const dot = await findDot(page);
+      if (dot) { await page.mouse.move(dot.x - 3, dot.y - 3); await page.mouse.move(dot.x, dot.y); }
+      await page.waitForTimeout(300);
+      const tip = await page.evaluate(() => {
+        const t = document.getElementById('tooltip');
+        return { vis: t.classList.contains('visible'), text: t.textContent, cursor: document.querySelector('.maplibregl-canvas').style.cursor };
+      });
+      check('hovering a dot shows the tooltip (name, id, status) and a pointer', !!dot && tip.vis && /Visited this year/.test(tip.text) && tip.cursor === 'pointer', JSON.stringify(tip));
       const probs = await problems();
       check('no console / CSP problems on load', probs.length === 0, probs.slice(0, 3).join(' | '));
       // A theme flip calls setStyle, which wipes custom layers: they must
