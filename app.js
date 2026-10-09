@@ -147,6 +147,10 @@
     button:   document.getElementById('btn-theme'),
     iconSun:  document.getElementById('icon-sun'),
     iconMoon: document.getElementById('icon-moon'),
+    // 0.10.0: dark -> light -> high contrast, so high contrast is reachable
+    // from the page, not only from ?theme= or storage.
+    cycle: true,
+    iconContrast: document.getElementById('icon-contrast'),
   });
   // React to the theme however it changed (this button, or any other
   // MCO.setTheme caller): the kit's mco:themechange event (0.9.0), not the

@@ -141,6 +141,23 @@ export default {
       }
       await ctx.close();
     }
+    // Theme toggle cycles dark -> light -> high contrast -> dark, naming the
+    // next theme; the map repaints its data in high contrast.
+    {
+      const { page, close } = await open('?theme=dark', { ready: dataReady });
+      const seen = [];
+      for (let i = 0; i < 3; i++) {
+        const label = await page.getAttribute('#btn-theme', 'aria-label');
+        await page.click('#btn-theme');
+        await page.waitForTimeout(i === 1 ? 4000 : 1500);
+        seen.push([label, await page.evaluate(() => document.documentElement.dataset.theme)]);
+        if (i === 1) seen.push(['hc dots', await dotPixels(page)]);
+      }
+      const ok = seen[0][1] === 'light' && /light/i.test(seen[0][0]) && seen[1][1] === 'high-contrast' && /high contrast/i.test(seen[1][0])
+        && seen[2][1] > 300 && seen[3][1] === 'dark' && /dark/i.test(seen[3][0]);
+      check('theme toggle cycles dark -> light -> high contrast -> dark; HC repaints dots', ok, JSON.stringify(seen));
+      await close();
+    }
     // Color mode: segmented buttons at 1440, a <select> at <=1060 — one value.
     {
       const { page, close } = await open('', { ready: dataReady });
