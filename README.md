@@ -71,7 +71,7 @@ python -m http.server 8000
 
 Open <http://localhost:8000>. The API is called cross-origin, so no backend is needed locally.
 
-Before pushing, run the manual verification gate (see `CLAUDE.md`): `node --check app.js`, `npx html-validate@9 index.html`, and the untracked `consumer-verify.mjs` harness, which answers the API from `fixtures/` (also untracked; the generator is in the harness header).
+Before pushing, run the manual verification gate (see `CLAUDE.md`): `node --check app.js`, `npx html-validate@9 index.html`, and mco-web-style's `tools/verify/` harness with this repo's `verify.config.mjs` (Chromium + WebKit, live API).
 
 ## Deployment
 
@@ -104,7 +104,7 @@ earlier commits live in [mesonet_app](https://github.com/mt-climate-office/meson
 
 ## Tooling
 
-- [MapLibre GL JS](https://maplibre.org) v5.18 via CDN.
+- [MapLibre GL JS](https://maplibre.org) v6.11.2, imported by the kit (`MCO.map.loadMapLibre`) with SRI from the page's import map.
 - [mco-web-style](https://github.com/mt-climate-office/mco-web-style) design kit (pinned, SRI).
 - [CARTO Basemaps](https://carto.com/basemaps) Positron + Dark Matter.
 - Vanilla JS / HTML / CSS — no bundler, no framework.

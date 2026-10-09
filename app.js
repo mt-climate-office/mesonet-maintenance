@@ -3,8 +3,10 @@
 
    Classic script, NOT a module: the kit ships mco-core.js / mco-map.js as
    plain globals (MCO, MCO.map), and a classic script keeps this file in the
-   same execution mode. Loaded at the end of <body>, after MapLibre and the
-   kit, so the DOM and every global it needs are already there.
+   same execution mode. Loaded at the end of <body>, after the kit, so the
+   DOM and every kit global are already there. MapLibre 6 is NOT: it is an
+   ES module the kit imports on demand, so the UI is wired first and the map
+   is built in initMap() once MCO.map.loadMapLibre() resolves (kit 0.8.0+).
 
    Extracted from the inline <script type="module"> during the mco-web-style
    migration (kit @0.6.0) — an external file is what lets the page ship a
@@ -135,6 +137,7 @@
     iconSun:  document.getElementById('icon-sun'),
     iconMoon: document.getElementById('icon-moon'),
     onChange: () => {
+      if (!map) { pushState(); return; }   // the library is still loading
       map.setStyle(MCO.map.cartoStyleUrl());
       map.once('style.load', () => {
         addCustomLayers();   // re-add — setStyle wipes our sources/layers
@@ -359,15 +362,24 @@
   let _selectedStation = _initStation;
 
   // ── Map init ─────────────────────────────────────────────────────────────
-  const map = new maplibregl.Map({
-    container: 'map',
-    style: MCO.map.cartoStyleUrl(),
-    ...MCO.map.initialCamera(urlParams),
-  });
-  MCO.map.addNavigation(map);                 // zoom buttons, no compass
-  // onBeforeFit closes the spider: fitting out to the whole state while a
-  // cluster is exploded would leave its legs drawn across empty map.
-  MCO.map.addFitControl(map, { onBeforeFit: () => closeSpider() });
+  // `map` stays null until MapLibre 6 has been imported (see Boot, at the
+  // bottom). Everything a control can reach before then checks for it.
+  let map = null;
+  let zoomFloor = null;
+  function initMap() {
+    map = new maplibregl.Map({
+      container: 'map',
+      style: MCO.map.cartoStyleUrl(),
+      ...MCO.map.initialCamera(urlParams),
+    });
+    MCO.map.addNavigation(map);                 // zoom buttons, no compass
+    // onBeforeFit closes the spider: fitting out to the whole state while a
+    // cluster is exploded would leave its legs drawn across empty map.
+    MCO.map.addFitControl(map, { onBeforeFit: () => closeSpider() });
+    wireMapLoad();
+    wireMapClick();
+    wireMapHover();
+  }
 
   function addCustomLayers() {
     if (!map.getSource('stations')) {
@@ -574,7 +586,7 @@
     };
   }
   function refreshLabelPaint() {
-    if (!map.getLayer('stations-id-label')) return;
+    if (!map || !map.getLayer('stations-id-label')) return;
     const p = stationLabelPaint();
     for (const lid of ['stations-id-label', 'spider-id-label']) {
       if (!map.getLayer(lid)) continue;
@@ -617,7 +629,7 @@
   }
 
   function refreshDotColors() {
-    if (!map.getLayer('stations-layer')) return;
+    if (!map || !map.getLayer('stations-layer')) { renderLegend(); return; }
     const color = paintColorForMode(activeMode);
     const stroke = dotStrokeColor();
     for (const lid of ['stations-layer', 'spider-layer']) {
@@ -672,6 +684,9 @@
         // Push initial URL so it's clean even if the user hasn't interacted yet
         pushState();
       }
+      // First meaningful state is on screen: release the kit's first-paint
+      // hold (0.9.0). Idempotent, so Refresh calling it again is harmless.
+      MCO.ready();
     } catch (err) {
       console.error(err);
       dataUnavailable = true;
@@ -684,6 +699,7 @@
       rebuildSource();
       applyAllFilters();
       renderLegend();
+      MCO.ready();
     }
   }
   // Only re-consume the deep-link once (initial load); Refresh shouldn't refly.
@@ -730,7 +746,7 @@
   }
 
   function rebuildSource() {
-    if (!map.getSource('stations')) return;
+    if (!map || !map.getSource('stations')) return;
 
     // Group visible-network stations by bucket and (re)compute colocation per
     // the currently-visible set. This both filters out hidden-network stations
@@ -857,7 +873,7 @@
   // filtering happens at source-emit time (see rebuildSource), so hidden-network
   // features aren't even in the source — no layer filter needed.
   function applyAllFilters() {
-    if (!map.getLayer('stations-layer')) return;
+    if (!map || !map.getLayer('stations-layer')) return;
     const key         = currentCatKey();
     const catMatch    = ['in', ['get', key], ['literal', [...currentCats()]]];
     const anchorOnly  = ['==', ['get', 'colocationIndex'], 0];
@@ -1048,10 +1064,11 @@
   // through escapeHTML like every other value in this template. Before this, a
   // `'` or `"` in p.thumb could break out of style="" and inject attributes.
   function safePhotoUrl(u) {
-    let url;
-    try { url = new URL(String(u)); } catch { return null; }
-    if (url.protocol !== 'https:') return null;
-    return url.href.replace(/['"()\\\s]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    // MCO.map.safeUrl (kit 0.8.0+): parsed, https: only, else null. Relative
+    // values resolve against this page, so require an absolute URL first.
+    const href = /^https:\/\//i.test(String(u)) ? MCO.map.safeUrl(u) : null;
+    if (!href) return null;
+    return href.replace(/['"()\\\s]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
   }
   function photosHTML(arr) {
     if (!Array.isArray(arr)) return '';
@@ -1219,7 +1236,7 @@
     rebuildSpider(anchorLngLat);
   }
   function closeSpider() {
-    if (_spiderBucket == null) return;
+    if (_spiderBucket == null || !map) return;
     _spiderBucket = null;
     map.getSource('spider')?.setData(emptyFC());
     map.getSource('spider-lines')?.setData(emptyFC());
@@ -1276,26 +1293,28 @@
   // Keeps Montana filling the viewport: snaps back when the user zooms out past
   // the fitted extent, and recomputes that floor after a resize settles (the
   // zoom that fits MT is viewport-dependent).
-  const zoomFloor = MCO.map.installZoomFloor(map);
-
-  map.on('load', () => {
-    addCustomLayers();
-    zoomFloor.refresh();
-    _mapReady = true;
-    // Kick off data fetch once layers exist, so rebuildSource never lands before its source.
-    loadAll();
-  });
-
-  // Reflect every pan/zoom in the URL so the view is sharable
-  map.on('moveend', pushState);
-
-  // Keep spider feet anchored at constant pixel offset while the camera moves.
-  // Coalesce multiple per-frame `move` events into a single rebuild via rAF.
   let _spiderMoveRaf = 0;
-  map.on('move', () => {
-    if (!_spiderBucket || _spiderMoveRaf) return;
-    _spiderMoveRaf = requestAnimationFrame(() => { _spiderMoveRaf = 0; rebuildSpider(); });
-  });
+  function wireMapLoad() {
+    zoomFloor = MCO.map.installZoomFloor(map);
+
+    map.on('load', () => {
+      addCustomLayers();
+      zoomFloor.refresh();
+      _mapReady = true;
+      // Kick off data fetch once layers exist, so rebuildSource never lands before its source.
+      loadAll();
+    });
+
+    // Reflect every pan/zoom in the URL so the view is sharable
+    map.on('moveend', pushState);
+
+    // Keep spider feet anchored at constant pixel offset while the camera moves.
+    // Coalesce multiple per-frame `move` events into a single rebuild via rAF.
+    map.on('move', () => {
+      if (!_spiderBucket || _spiderMoveRaf) return;
+      _spiderMoveRaf = requestAnimationFrame(() => { _spiderMoveRaf = 0; rebuildSpider(); });
+    });
+  }
 
   // ── URL state push ───────────────────────────────────────────────────────
   // Lists are space-joined; URLSearchParams encodes spaces as '+', giving
@@ -1382,40 +1401,42 @@
   // Single dispatcher so badge + dot at the same point can't double-fire.
   // For stacked anchors: clicking opens (or toggles) the spider only — popups are
   // only opened by a second click on one of the spider feet.
-  map.on('click', (e) => {
-    const feats = map.queryRenderedFeatures(e.point, {
-      layers: ['spider-layer', 'stations-layer', 'stations-badge'],
+  function wireMapClick() {
+    map.on('click', (e) => {
+      const feats = map.queryRenderedFeatures(e.point, {
+        layers: ['spider-layer', 'stations-layer', 'stations-badge'],
+      });
+      if (feats.length === 0) {
+        closeSpider();
+        closePopup();
+        return;
+      }
+      const f =
+        feats.find(x => x.layer.id === 'spider-layer') ||
+        feats.find(x => x.layer.id === 'stations-layer') ||
+        feats[0];
+      const props  = f.properties;
+      const lngLat = f.geometry.coordinates.slice();
+      if (f.layer.id === 'spider-layer') {
+        // Second click — open the popup for the chosen station
+        openPopupFor(props.station, lngLat);
+        return;
+      }
+      // Click on the anchor (or its badge) of a stacked site → ensure the spider
+      // is open AND open the anchor station's popup. (Hover already opens the spider
+      // on desktop; on mobile this click is the first user gesture.) Dismissal is
+      // via clicking elsewhere or pressing Esc — same as any popup.
+      if (props.colocationCount > 1) {
+        cancelSpiderClose();
+        if (_spiderBucket !== props.bucket) openSpider(props.bucket, lngLat);
+        openPopupFor(props.station, lngLat);
+        return;
+      }
+      // Plain (non-co-located) station — close any open spider, open popup directly
+      if (_spiderBucket) closeSpider();
+      openPopupFor(props.station, lngLat);
     });
-    if (feats.length === 0) {
-      closeSpider();
-      closePopup();
-      return;
-    }
-    const f =
-      feats.find(x => x.layer.id === 'spider-layer') ||
-      feats.find(x => x.layer.id === 'stations-layer') ||
-      feats[0];
-    const props  = f.properties;
-    const lngLat = f.geometry.coordinates.slice();
-    if (f.layer.id === 'spider-layer') {
-      // Second click — open the popup for the chosen station
-      openPopupFor(props.station, lngLat);
-      return;
-    }
-    // Click on the anchor (or its badge) of a stacked site → ensure the spider
-    // is open AND open the anchor station's popup. (Hover already opens the spider
-    // on desktop; on mobile this click is the first user gesture.) Dismissal is
-    // via clicking elsewhere or pressing Esc — same as any popup.
-    if (props.colocationCount > 1) {
-      cancelSpiderClose();
-      if (_spiderBucket !== props.bucket) openSpider(props.bucket, lngLat);
-      openPopupFor(props.station, lngLat);
-      return;
-    }
-    // Plain (non-co-located) station — close any open spider, open popup directly
-    if (_spiderBucket) closeSpider();
-    openPopupFor(props.station, lngLat);
-  });
+  }
 
   // ── Hover tooltip + hover-open spider for co-located sites ────────────────
   const tooltipEl = document.getElementById('tooltip');
@@ -1451,34 +1472,36 @@
   const ANCHOR_LAYER_IDS = new Set(['stations-layer', 'stations-badge', 'stations-id-label']);
   let _hoveredStation = null;
 
-  map.on('mousemove', (e) => {
-    const layers = HOVER_LAYERS.filter(lid => map.getLayer(lid));
-    const feats = layers.length ? map.queryRenderedFeatures(e.point, { layers }) : [];
-    const f = feats[0] || null;
-    if (f) {
-      map.getCanvas().style.cursor = 'pointer';
-      cancelSpiderClose();
-      showTooltip(f.properties.station, e);
-      _hoveredStation = f.properties.station;
-      if (ANCHOR_LAYER_IDS.has(f.layer.id)
-          && f.properties.colocationCount > 1
-          && _spiderBucket !== f.properties.bucket) {
-        openSpider(f.properties.bucket, f.geometry.coordinates.slice());
+  function wireMapHover() {
+    map.on('mousemove', (e) => {
+      const layers = HOVER_LAYERS.filter(lid => map.getLayer(lid));
+      const feats = layers.length ? map.queryRenderedFeatures(e.point, { layers }) : [];
+      const f = feats[0] || null;
+      if (f) {
+        map.getCanvas().style.cursor = 'pointer';
+        cancelSpiderClose();
+        showTooltip(f.properties.station, e);
+        _hoveredStation = f.properties.station;
+        if (ANCHOR_LAYER_IDS.has(f.layer.id)
+            && f.properties.colocationCount > 1
+            && _spiderBucket !== f.properties.bucket) {
+          openSpider(f.properties.bucket, f.geometry.coordinates.slice());
+        }
+      } else if (_hoveredStation !== null) {
+        map.getCanvas().style.cursor = '';
+        hideTooltip();
+        scheduleSpiderClose();
+        _hoveredStation = null;
       }
-    } else if (_hoveredStation !== null) {
+    });
+    // Cursor + tooltip cleanup when the pointer leaves the map entirely.
+    map.getCanvas().addEventListener('mouseleave', () => {
       map.getCanvas().style.cursor = '';
       hideTooltip();
       scheduleSpiderClose();
       _hoveredStation = null;
-    }
-  });
-  // Cursor + tooltip cleanup when the pointer leaves the map entirely.
-  map.getCanvas().addEventListener('mouseleave', () => {
-    map.getCanvas().style.cursor = '';
-    hideTooltip();
-    scheduleSpiderClose();
-    _hoveredStation = null;
-  });
+    });
+  }
 
   // Global keyboard shortcuts: ESC closes things; / focuses search.
   window.addEventListener('keydown', (e) => {
@@ -1548,6 +1571,7 @@
   document.getElementById('btn-refresh').addEventListener('click', () => {
     // Don't refly to the deep-linked station on a manual refresh.
     if (_initStationConsumed) { /* deep link already handled */ }
+    if (!_mapReady) return;   // the map's load handler runs the first fetch
     refreshStampEl.textContent = 'loading…';
     loadAll();
   });
@@ -1561,6 +1585,7 @@
   const labelsBtn = document.getElementById('btn-labels');
   labelsBtn.setAttribute('aria-pressed', labelsOn ? 'true' : 'false');
   function applyLabelsVisibility() {
+    if (!map) return;
     const vis = labelsOn ? 'visible' : 'none';
     for (const lid of ['stations-id-label', 'spider-id-label']) {
       if (map.getLayer(lid)) map.setLayoutProperty(lid, 'visibility', vis);
@@ -1724,7 +1749,14 @@
   }
 
   // ── Boot ─────────────────────────────────────────────────────────────────
-  // The map's 'load' event drives the data fetch — see map.on('load') above.
+  // The UI above is wired; the map waits for MapLibre 6 (an ES module the kit
+  // imports). Its 'load' event then drives the data fetch — see wireMapLoad().
   renderLegend();
+  MCO.map.loadMapLibre().then(initMap, (err) => {
+    console.error(err);
+    refreshStampEl.textContent = 'map unavailable';
+    MCO.notice({ tone: 'danger', text: 'The map library failed to load. Check your connection and reload the page.' });
+    MCO.ready();
+  });
 
 })();

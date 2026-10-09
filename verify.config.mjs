@@ -56,6 +56,12 @@ export default {
       check(`station dots paint on the canvas (${n} px in data colors)`, n > 300, String(n));
       const probs = await problems();
       check('no console / CSP problems on load', probs.length === 0, probs.slice(0, 3).join(' | '));
+      // A theme flip calls setStyle, which wipes custom layers: they must
+      // come back, with data.
+      await page.click('#btn-theme');
+      await page.waitForTimeout(4000);
+      const n2 = await dotPixels(page);
+      check(`station dots repaint after a theme flip (${n2} px)`, n2 > 300, String(n2));
       await close();
     }
     // Deep link opens the popup, and its visit photos actually load.
