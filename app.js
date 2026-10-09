@@ -26,13 +26,6 @@
   const MAINT_URL    = `${API_BASE}/stations/maintenance/live?type=json`;
   const DASH_URL     = (s) => `https://mesonet.climate.umt.edu/dash/${encodeURIComponent(s)}`;
 
-  // Initial fit (a touch padded around Montana's actual extent). Snapback on
-  // zoom-out uses these same bounds — matching the snowpack-explorer pattern.
-  // The Montana extent and its fit options are kit defaults
-  // (MCO.map.MT_FIT_BOUNDS / MCO.map.FIT_OPTS); aliased here for the few direct
-  // fitBounds/cameraForBounds calls below rather than redeclared.
-  const MT_FIT_BOUNDS = MCO.map.MT_FIT_BOUNDS;
-  const FIT_OPTS      = MCO.map.FIT_OPTS;
 
   // Spider geometry / interaction
   const SPIDER_RADIUS_PX        = 26;     // distance from anchor to spider foot
@@ -157,7 +150,7 @@
     onChange: () => {
       // The every-style.load handler in wireMapLoad() re-adds our layers.
       if (map) map.setStyle(MCO.map.cartoStyleUrl());
-      pushState();
+      writeUrl();
     },
   });
 
@@ -341,7 +334,7 @@
   // ?kbd=off disables the single-character '/' shortcut (WCAG 2.1.4 — a
   // speech-input user can misfire it just by dictating a sentence). Read up
   // here with the rest of the URL state, not down in the keyboard section:
-  // pushState() emits it and can run during init, which would put a late
+  // writeUrl() emits it and can run during init, which would put a late
   // `const` in its temporal dead zone.
   const kbdShortcuts = getLower('kbd') !== 'off';
 
@@ -697,7 +690,7 @@
         _initStationConsumed = true;
       } else {
         // Push initial URL so it's clean even if the user hasn't interacted yet
-        pushState();
+        writeUrl();
       }
       // First meaningful state is on screen: release the kit's first-paint
       // hold (0.9.0). Idempotent, so Refresh calling it again is harmless.
@@ -913,7 +906,7 @@
         rebuildSource();   // re-emit source so colocation reflects visible networks
         applyAllFilters();
         renderLegend();    // counts depend on visible networks
-        pushState();
+        writeUrl();
       });
       subnetFiltersEl.appendChild(chip);
     }
@@ -1267,7 +1260,7 @@
       if (st !== 'closed') { _sheetOpen = true; return; }
       _sheetOpen = false;
       if (_suppressSheetClose) { _suppressSheetClose = false; return; }
-      if (_selectedStation) { _selectedStation = null; pushState(); }
+      if (_selectedStation) { _selectedStation = null; writeUrl(); }
     },
   });
   function openSheetFor(stationId) {
@@ -1285,7 +1278,7 @@
     if (MCO.viewport.isCompact()) {
       openSheetFor(stationId);
       announcePopup(stationId);
-      pushState();
+      writeUrl();
       return;
     }
     if (_sheetOpen) { _suppressSheetClose = true; stationSheet.close({ restoreFocus: false }); }
@@ -1298,12 +1291,12 @@
       if (_popup === p) {
         _popup = null;
         _selectedStation = null;
-        pushState();
+        writeUrl();
       }
     });
     _popup = p;
     announcePopup(stationId);
-    pushState();
+    writeUrl();
   }
 
   // ── Spider expand ────────────────────────────────────────────────────────
@@ -1396,7 +1389,7 @@
     });
 
     // Reflect every pan/zoom in the URL so the view is sharable
-    map.on('moveend', pushState);
+    map.on('moveend', writeUrl);
 
     // Keep spider feet anchored at constant pixel offset while the camera moves.
     // Coalesce multiple per-frame `move` events into a single rebuild via rAF.
@@ -1406,33 +1399,14 @@
     });
   }
 
-  // ── URL state push ───────────────────────────────────────────────────────
+  // ── URL state ────────────────────────────────────────────────────────────
   // Lists are space-joined; URLSearchParams encodes spaces as '+', giving
   // tidy URLs like net=hydromet+agrimet. Enum-string values are lowercase.
   // Every parameter has a default and none is written while it matches, so a
   // fresh load carries no query string at all (HOUSE-STYLE §4).
-  function osTheme() {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
-  // Is the camera where a fresh load would have put it? cameraForBounds gives
-  // the same answer fitBounds acts on, so this stays correct as the container
-  // resizes rather than comparing against a stored constant.
-  function atDefaultExtent() {
-    if (!_mapReady) return true;
-    let want;
-    try { want = map.cameraForBounds(MT_FIT_BOUNDS, FIT_OPTS); } catch { return false; }
-    if (!want) return false;
-    const wc = want.center;
-    const wlng = typeof wc.lng === 'number' ? wc.lng : wc[0];
-    const wlat = typeof wc.lat === 'number' ? wc.lat : wc[1];
-    const c = map.getCenter();
-    return Math.abs(map.getZoom() - want.zoom) < 0.02
-        && Math.abs(c.lng - wlng) < 0.01
-        && Math.abs(c.lat - wlat) < 0.01;
-  }
-
-  function pushState() {
+  // Mirror the view into the query string (history.replaceState via the kit).
+  // Was named pushState(), which it never did: it replaces. (MIGRATING 0.8.0)
+  function writeUrl() {
     const params = {};
     if (activeMode !== 'compliance') params.mode = activeMode;
     // Default is every known sub-network, so only a narrowed selection is
@@ -1455,16 +1429,18 @@
     // either way — the parameter exists so a shared link can carry a
     // deliberate one, not so every link imposes the sender's theme.
     const theme = MCO.getTheme();
-    if (theme && theme !== osTheme()) params.theme = theme;
+    if (theme && theme !== MCO.osTheme()) params.theme = theme;
     // The camera's default is the fitted Montana extent. Emitted as a set,
     // because the parser needs all three to position the map.
-    if (!atDefaultExtent()) Object.assign(params, MCO.map.cameraParams(map));
+    // cameraParamsIfDefault (kit 0.8.0) is {} while the camera sits where a
+    // fresh load fits Montana, so a default view writes no lng/lat/zoom.
+    if (_mapReady) Object.assign(params, MCO.map.cameraParamsIfDefault(map));
     if (_selectedStation) params.station = _selectedStation;
     MCO.replaceUrlState(params);
   }
 
   // Track whether the next Popup `close` event was triggered programmatically
-  // (so we don't pushState for an open-replace; the new popup pushes its own state).
+  // (so we don't writeUrl for an open-replace; the new popup pushes its own state).
   let _suppressNextPopupClose = false;
   function closePopup() {
     if (_sheetOpen) { stationSheet.close(); return; }   // onState clears the selection
@@ -1474,7 +1450,7 @@
     _popup = null;
     if (_selectedStation) {
       _selectedStation = null;
-      pushState();
+      writeUrl();
     }
   }
 
@@ -1616,7 +1592,7 @@
     MCO.lsSet('mco-maint-mode', activeMode);
     refreshDotColors();
     applyAllFilters();  // category filter belongs to the active mode
-    pushState();
+    writeUrl();
   }
   const modeCtl = MCO.initSegmentedFallback({
     group: document.getElementById('mode-seg'),
@@ -1655,7 +1631,7 @@
     labelsBtn.setAttribute('aria-pressed', labelsOn ? 'true' : 'false');
     MCO.lsSet('mco-maint-labels', labelsOn ? 'on' : 'off');
     applyLabelsVisibility();
-    pushState();
+    writeUrl();
   });
 
   // ── Legend collapse/expand ───────────────────────────────────────────────
@@ -1676,7 +1652,7 @@
   })();
 
   // apply() runs once at init and calls onChange with it. Don't let that first
-  // call reach pushState: it would rewrite the URL before the deep-link handler
+  // call reach writeUrl: it would rewrite the URL before the deep-link handler
   // has set _selectedStation, stripping ?station= off the link that opened it.
   let _legendInit = true;
   MCO.initCollapsible({
@@ -1687,7 +1663,7 @@
     onChange: (collapsed) => {
       legendCollapsed = collapsed;
       legendToggleBtn.setAttribute('aria-label', collapsed ? 'Expand legend' : 'Collapse legend');
-      if (!_legendInit) pushState();
+      if (!_legendInit) writeUrl();
     },
   });
   _legendInit = false;
@@ -1761,7 +1737,7 @@
         const set = currentCats();
         for (const k of rowKeys) { if (vis.has(k)) set.add(k); else set.delete(k); }
         applyAllFilters();
-        pushState();
+        writeUrl();
       },
     });
   }
