@@ -1260,7 +1260,7 @@
       if (st !== 'closed') { _sheetOpen = true; return; }
       _sheetOpen = false;
       if (_suppressSheetClose) { _suppressSheetClose = false; return; }
-      if (_selectedStation) { _selectedStation = null; writeUrl(); }
+      if (_selectedStation) deselected();
     },
   });
   function openSheetFor(stationId) {
@@ -1274,11 +1274,14 @@
     const s = stationById.get(stationId);
     if (!s) return;
     if (_popup) { _suppressNextPopupClose = true; _popup.remove(); _popup = null; }
+    // Drill-down gets ONE history entry: push on the first step from "no
+    // station open", replace while one stays open (HOUSE-STYLE §4).
+    const push = !_selectedStation && !_fromHistory;
     _selectedStation = stationId;
     if (MCO.viewport.isCompact()) {
       openSheetFor(stationId);
       announcePopup(stationId);
-      writeUrl();
+      writeUrl({ push });
       return;
     }
     if (_sheetOpen) { _suppressSheetClose = true; stationSheet.close({ restoreFocus: false }); }
@@ -1290,13 +1293,12 @@
       if (_suppressNextPopupClose) { _suppressNextPopupClose = false; return; }
       if (_popup === p) {
         _popup = null;
-        _selectedStation = null;
-        writeUrl();
+        deselected();
       }
     });
     _popup = p;
     announcePopup(stationId);
-    writeUrl();
+    writeUrl({ push });
   }
 
   // ── Spider expand ────────────────────────────────────────────────────────
@@ -1406,7 +1408,7 @@
   // fresh load carries no query string at all (HOUSE-STYLE §4).
   // Mirror the view into the query string (history.replaceState via the kit).
   // Was named pushState(), which it never did: it replaces. (MIGRATING 0.8.0)
-  function writeUrl() {
+  function writeUrl(opts) {
     const params = {};
     if (activeMode !== 'compliance') params.mode = activeMode;
     // Default is every known sub-network, so only a narrowed selection is
@@ -1436,22 +1438,44 @@
     // fresh load fits Montana, so a default view writes no lng/lat/zoom.
     if (_mapReady) Object.assign(params, MCO.map.cameraParamsIfDefault(map));
     if (_selectedStation) params.station = _selectedStation;
-    MCO.replaceUrlState(params);
+    if (opts && opts.push) MCO.pushUrlState(params, { state: { mcoDetail: _selectedStation } });
+    else MCO.replaceUrlState(params);
   }
 
   // Track whether the next Popup `close` event was triggered programmatically
   // (so we don't writeUrl for an open-replace; the new popup pushes its own state).
   let _suppressNextPopupClose = false;
+  // The station closed. If its entry was one we pushed, step Back over it
+  // rather than leave a dead "station open" entry in the history; popstate
+  // then re-syncs the URL to the current view. Otherwise just replace.
+  let _fromHistory = false;
+  function deselected() {
+    _selectedStation = null;
+    if (!_fromHistory && history.state && history.state.mcoDetail) history.back();
+    else writeUrl();
+  }
+  // Back/Forward (MCO.onUrlState): open or close the station to match.
+  MCO.onUrlState((params) => {
+    const id = (params.get('station') || '').toLowerCase() || null;
+    _fromHistory = true;
+    try {
+      if (id && id !== _selectedStation && stationById.has(id)) {
+        closeSpider();
+        openPopupFor(id);
+      } else if (!id && _selectedStation) {
+        closePopup();
+      }
+    } finally { _fromHistory = false; }
+    writeUrl();   // sync the camera etc. into the restored entry
+  });
+
   function closePopup() {
     if (_sheetOpen) { stationSheet.close(); return; }   // onState clears the selection
     if (!_popup) return;
     _suppressNextPopupClose = true;
     _popup.remove();
     _popup = null;
-    if (_selectedStation) {
-      _selectedStation = null;
-      writeUrl();
-    }
+    if (_selectedStation) deselected();
   }
 
   // ── Spider close grace period (so cursor can travel from anchor to a foot) ─

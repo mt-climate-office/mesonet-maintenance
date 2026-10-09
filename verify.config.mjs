@@ -215,6 +215,31 @@ export default {
       check('Esc closes the sheet, un-inerts <main>, drops ?station=', after.st === 'closed' && !after.inert && !/station=/.test(after.q), JSON.stringify(after));
       await close();
     }
+    // Drill-down history: opening a station pushes ONE entry; Back closes it,
+    // Forward reopens it; Esc on a pushed station steps back over its entry.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      const len0 = await page.evaluate(() => history.length);
+      await page.locator('#search-input').fill('ashla');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.maplibregl-popup', { timeout: 15000 });
+      await page.waitForTimeout(500);
+      const a = await page.evaluate(() => ({ len: history.length, q: location.search }));
+      await page.goBack();
+      await page.waitForTimeout(800);
+      const b = await page.evaluate(() => ({ popup: !!document.querySelector('.maplibregl-popup'), q: location.search }));
+      await page.goForward();
+      await page.waitForTimeout(800);
+      const c = await page.evaluate(() => ({ popup: /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), q: location.search }));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(800);
+      const d = await page.evaluate(() => ({ popup: !!document.querySelector('.maplibregl-popup'), q: location.search }));
+      check('station open pushes one entry; Back closes, Forward reopens, Esc steps back',
+        a.len === len0 + 1 && /station=aceashla/.test(a.q) && !b.popup && !/station=/.test(b.q) && c.popup && /station=aceashla/.test(c.q) && !d.popup && !/station=/.test(d.q),
+        JSON.stringify({ len0, a, b, c, d }));
+      await close();
+    }
     // Deep link opens the popup, and its visit photos actually load.
     {
       const { page, close, problems } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, settleMs: 500 });
