@@ -275,28 +275,9 @@
     }
 
     /* ── Popup ─────────────────────────────────────────────────────────────── */
-    /* MapLibre popups ship with NO z-index, so they need a tier of their own.
-       --z-detail sits above the legend panel and the map notices, and below the
-       search dropdown (--z-flyout), the tooltip (--z-cursor) and the navbar.
-       A popup opening over the bottom-left legend stays fully readable and
-       clickable, which is the behaviour the old hard-coded 40 was chosen for. */
-    .maplibregl-popup { max-width: 340px !important; z-index: var(--z-detail); }
-    .maplibregl-popup-content {
-      background: var(--bg-surface) !important;
-      color: var(--text-primary) !important;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md) !important;
-      padding: 12px 14px 12px !important;
-      box-shadow: var(--shadow) !important;
-      font-family: var(--font-ui);
-    }
-    .maplibregl-popup-tip { border-top-color: var(--bg-surface) !important; border-bottom-color: var(--bg-surface) !important; }
-    .maplibregl-popup-close-button {
-      color: var(--text-muted) !important;
-      font-size: 1.1rem !important; padding: 2px 6px !important;
-    }
-    .pop-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); line-height: 1.2; padding-right: 18px; }
-    .pop-sub   { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+    /* The shell (surface, border, tip, close button, z tier, title/subtitle,
+       action bar) is the kit's: MCO.map.popupContent + .mco-popup. What
+       follows is this map's visit history inside it. */
     /* Pill text is 0.64rem bold — "normal text" by WCAG's sizing rule, so each
        pill needs 4.5:1 against its OWN fill (1.4.3). Three were white on a
        light fill and failed before this migration: new was 2.43:1, as_needed
@@ -326,6 +307,7 @@
     .visit-item { padding: 6px 2px; border-bottom: 1px solid var(--border-glass); font-size: 0.73rem; }
     .visit-item:last-child { border-bottom: 0; }
     .visit-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .visit-rel { color: var(--text-muted); }
     .visit-date { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); font-weight: 600; }
     .trip-chip {
       font-size: 0.6rem; font-weight: 600; padding: 1px 6px; border-radius: 999px;
@@ -347,9 +329,6 @@
     .visit-tasks ul { margin: 3px 0 0 8px; padding: 0 0 0 14px; }
     .visit-tasks li { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4; list-style: disc; }
     .pop-empty { font-size: 0.72rem; color: var(--text-muted); font-style: italic; padding: 4px 2px; }
-    .pop-links { margin-top: 10px; }
-    .pop-links a { font-size: 0.78rem; color: var(--accent-light); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-    .pop-links a:hover { text-decoration: underline; }
 
     /* ── Visit photos + lightbox ─────────────────────────────────────────── */
     .visit-photos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
@@ -438,8 +417,8 @@
     @media (hover: none) {
       .chip { min-height: 40px; }
       /* Popup controls the 390px touch gate found (kit 0.9.0): the tasks
-         disclosure and the dashboard link were 20px tall. */
-      .visit-tasks > summary, .pop-links a { min-height: 40px; }
+         disclosure was 20px tall. (The dashboard link is now a kit .nav-btn.) */
+      .visit-tasks > summary { min-height: 40px; }
     }
   </style>
 </head>

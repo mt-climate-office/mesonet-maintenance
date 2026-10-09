@@ -986,15 +986,12 @@
 
   // ── Popup ────────────────────────────────────────────────────────────────
   // ── Photo lightbox (visit photos) ───────────────────────────────────────
-  const _galleries = new Map();   // gallery id → [{thumb, full, filename}]
-  let _galleryCounter = 0;
   // Photo URLs come from the API response (AirTable attachments), so they are
-  // untrusted input to an HTML attribute AND a CSS url(). https only — anything
-  // else (javascript:, data:, a relative path, garbage) is dropped — and the
-  // characters that could end the CSS string or the url() token are
-  // percent-encoded, which is the same URL to the server. The result then goes
-  // through escapeHTML like every other value in this template. Before this, a
-  // `'` or `"` in p.thumb could break out of style="" and inject attributes.
+  // untrusted. https only — anything else (javascript:, data:, a relative
+  // path, garbage) is dropped — and the characters that could end the CSS
+  // string or the url() token are percent-encoded, which is the same URL to
+  // the server. They reach the DOM only through style properties and .src,
+  // never markup (the popup used to interpolate p.thumb into style="").
   function safePhotoUrl(u) {
     // MCO.map.safeUrl (kit 0.8.0+): parsed, https: only, else null. Relative
     // values resolve against this page, so require an absolute URL first.
@@ -1002,19 +999,30 @@
     if (!href) return null;
     return href.replace(/['"()\\\s]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
   }
-  function photosHTML(arr) {
-    if (!Array.isArray(arr)) return '';
+  // Tiny DOM builder for the popup: text only ever goes in as textContent.
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function photosEl(arr) {
+    if (!Array.isArray(arr)) return null;
     const photos = arr
       .map((p) => p && { thumb: safePhotoUrl(p.thumb), full: safePhotoUrl(p.full), filename: p.filename })
       .filter((p) => p && p.thumb && p.full);
-    if (!photos.length) return '';
-    const gid = 'g' + (_galleryCounter++);
-    _galleries.set(gid, photos);
-    return `<div class="visit-photos">${photos.map((p, i) =>
-      `<button type="button" class="visit-photo-thumb" data-gid="${gid}" data-idx="${i}" ` +
-      `style="background-image:url('${MCO.escapeHTML(p.thumb)}')" ` +
-      `aria-label="View photo ${i + 1} of ${photos.length}"${p.filename ? ` title="${MCO.escapeHTML(p.filename)}"` : ''}></button>`
-    ).join('')}</div>`;
+    if (!photos.length) return null;
+    const wrap = el('div', 'visit-photos');
+    photos.forEach((p, i) => {
+      const b = el('button', 'visit-photo-thumb');
+      b.type = 'button';
+      b.style.backgroundImage = `url("${p.thumb}")`;
+      b.setAttribute('aria-label', `View photo ${i + 1} of ${photos.length}`);
+      if (p.filename) b.title = String(p.filename);
+      b.addEventListener('click', () => openLightbox(photos, i));
+      wrap.appendChild(b);
+    });
+    return wrap;
   }
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightbox-img');
@@ -1059,14 +1067,6 @@
     if (e.key === 'ArrowLeft') { e.preventDefault(); stepLightbox(-1); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
   });
-  // Delegated: a thumbnail anywhere (incl. inside a popup) opens its gallery.
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest && e.target.closest('.visit-photo-thumb');
-    if (!btn) return;
-    const photos = _galleries.get(btn.dataset.gid);
-    if (photos) openLightbox(photos, +btn.dataset.idx);
-  });
-
   const STATE_PILL = {
     visited:   { cls: 'visited',   lbl: 'Visited this year' },
     overdue:   { cls: 'overdue',   lbl: 'Overdue' },
@@ -1077,68 +1077,111 @@
   // Trip-type chip colors are pulled from the trip-type legend so they always match.
   const TRIP_COLORS = Object.fromEntries(MODES.triptype.cats.map(c => [c.key, c.color]));
   function tripChips(arr) {
-    if (!arr || !arr.length) return '';
-    return arr.map(t => {
+    const frag = document.createDocumentFragment();
+    for (const t of (Array.isArray(arr) ? arr : [])) {
       const c = TRIP_COLORS[t] || TRIP_COLORS['Other'];
       // The category color marks the border and a light tint; the TEXT stays
       // --text-primary (CSS). Colored text failed 1.4.3 — Maintenance teal on
-      // the dark popup surface measured under 4.5:1.
-      return `<span class="trip-chip" style="border-color:${c};background:${c}22">${MCO.escapeHTML(t)}</span>`;
-    }).join(' ');
+      // the dark popup surface measured under 4.5:1. c is one of MODES' hexes.
+      const chip = el('span', 'trip-chip', t);
+      chip.style.borderColor = c;
+      chip.style.background = c + '22';
+      frag.append(chip, ' ');
+    }
+    return frag;
   }
-  function visitHTML(v) {
-    const who = v.inspected_by ? `<div class="visit-who"><span class="lbl">By</span> ${MCO.escapeHTML(v.inspected_by)}</div>` : '';
-    const note = (v.comments || v.description) ? `<div class="visit-note">${MCO.escapeHTML(v.comments || v.description)}</div>` : '';
+  function visitEl(v) {
+    const item = el('div', 'visit-item');
+    const head = el('div', 'visit-head');
+    head.appendChild(el('span', 'visit-date', fmtDate(v.date)));
+    if (v.date) head.appendChild(el('span', 'visit-rel', `· ${relDays(v.date)}`));
+    head.appendChild(tripChips(v.trip_type));
+    item.appendChild(head);
+    if (v.inspected_by) {
+      const who = el('div', 'visit-who');
+      who.append(el('span', 'lbl', 'By'), ' ' + v.inspected_by);
+      item.appendChild(who);
+    }
+    if (v.comments || v.description) item.appendChild(el('div', 'visit-note', v.comments || v.description));
     const sensors = [];
-    if (v.sensors_added && v.sensors_added.length) sensors.push('+ ' + v.sensors_added.map(MCO.escapeHTML).join(', '));
-    if (v.sensors_removed && v.sensors_removed.length) sensors.push('− ' + v.sensors_removed.map(MCO.escapeHTML).join(', '));
-    const sens = sensors.length ? `<div class="visit-sensors">${sensors.join(' · ')}</div>` : '';
-    const tasks = (v.tasks && v.tasks.length)
-      ? `<details class="visit-tasks"><summary>${v.tasks.length} task${v.tasks.length === 1 ? '' : 's'} completed</summary><ul>${v.tasks.map(t => `<li>${MCO.escapeHTML(t)}</li>`).join('')}</ul></details>`
-      : '';
-    const rel = v.date ? ` <span style="color:var(--text-muted)">· ${MCO.escapeHTML(relDays(v.date))}</span>` : '';
-    return `<div class="visit-item"><div class="visit-head"><span class="visit-date">${MCO.escapeHTML(fmtDate(v.date))}</span>${rel} ${tripChips(v.trip_type)}</div>${who}${note}${sens}${tasks}${photosHTML(v.photos)}</div>`;
+    if (v.sensors_added && v.sensors_added.length) sensors.push('+ ' + v.sensors_added.join(', '));
+    if (v.sensors_removed && v.sensors_removed.length) sensors.push('− ' + v.sensors_removed.join(', '));
+    if (sensors.length) item.appendChild(el('div', 'visit-sensors', sensors.join(' · ')));
+    if (v.tasks && v.tasks.length) {
+      const d = el('details', 'visit-tasks');
+      d.appendChild(el('summary', null, `${v.tasks.length} task${v.tasks.length === 1 ? '' : 's'} completed`));
+      const ul = el('ul');
+      for (const t of v.tasks) ul.appendChild(el('li', null, t));
+      d.appendChild(ul);
+      item.appendChild(d);
+    }
+    const ph = photosEl(v.photos);
+    if (ph) item.appendChild(ph);
+    return item;
   }
-  function popupHTML(stationId) {
+  // "Label: <strong>value</strong> (rel)" — a line of the summary box.
+  function summaryLine(parent, label, value, rel) {
+    parent.append(label, el('strong', null, value));
+    if (rel) parent.append(` (${rel})`);
+  }
+  function stationBodyEl(stationId) {
     const s = stationById.get(stationId);
-    if (!s) return '';
     const m = maintBySta.get(stationId) || null;
     const state = complianceStateFor(s);
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
+    const body = document.createDocumentFragment();
 
-    let summary;
+    const pillRow = el('div');
+    pillRow.appendChild(el('span', `pop-pill ${pill.cls}`, pill.lbl));
+    body.appendChild(pillRow);
+
+    const summary = el('div', 'pop-summary');
     if (dataUnavailable) {
-      summary = `<div class="pop-summary">Maintenance data is currently unavailable.</div>`;
+      summary.textContent = 'Maintenance data is currently unavailable.';
     } else if (state === 'new') {
-      summary = `<div class="pop-summary">Installed this year — not yet due for its annual <strong>Maintenance</strong> visit.</div>`;
+      summary.append('Installed this year — not yet due for its annual ', el('strong', null, 'Maintenance'), ' visit.');
     } else if (state === 'as_needed') {
-      const base = (m && m.last_qualifying_visit_date)
-        ? `Last Maintenance: <strong>${MCO.escapeHTML(fmtDate(m.last_qualifying_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_qualifying_visit_date))})<br>`
-        : (m && m.last_visit_date)
-          ? `Last visit of any type: <strong>${MCO.escapeHTML(fmtDate(m.last_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_visit_date))})<br>`
-          : '';
-      summary = `<div class="pop-summary">${base}AgriMet station — visited as needed, not subject to the annual Maintenance requirement.</div>`;
+      if (m && m.last_qualifying_visit_date) {
+        summaryLine(summary, 'Last Maintenance: ', fmtDate(m.last_qualifying_visit_date), relDays(m.last_qualifying_visit_date));
+        summary.appendChild(el('br'));
+      } else if (m && m.last_visit_date) {
+        summaryLine(summary, 'Last visit of any type: ', fmtDate(m.last_visit_date), relDays(m.last_visit_date));
+        summary.appendChild(el('br'));
+      }
+      summary.append('AgriMet station — visited as needed, not subject to the annual Maintenance requirement.');
     } else if (m && m.last_qualifying_visit_date) {
-      summary = `<div class="pop-summary">Last Maintenance: <strong>${MCO.escapeHTML(fmtDate(m.last_qualifying_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_qualifying_visit_date))})<br>` +
-                `<strong>${MCO.escapeHTML(String(m.qualifying_visits_this_year))}</strong> Maintenance visit${m.qualifying_visits_this_year === 1 ? '' : 's'} this year</div>`;
+      summaryLine(summary, 'Last Maintenance: ', fmtDate(m.last_qualifying_visit_date), relDays(m.last_qualifying_visit_date));
+      summary.appendChild(el('br'));
+      const n = m.qualifying_visits_this_year;
+      summary.append(el('strong', null, String(n)), ` Maintenance visit${n === 1 ? '' : 's'} this year`);
     } else {
-      summary = `<div class="pop-summary">No <strong>Maintenance</strong> visit on record${m && m.last_visit_date ? ` (last visit of any type ${MCO.escapeHTML(fmtDate(m.last_visit_date))})` : ''}.</div>`;
+      summary.append('No ', el('strong', null, 'Maintenance'), ' visit on record' +
+        (m && m.last_visit_date ? ` (last visit of any type ${fmtDate(m.last_visit_date)})` : '') + '.');
     }
+    body.appendChild(summary);
 
-    const visits = (m && m.visits && m.visits.length)
-      ? `<div class="pop-section-title">Visits</div><div class="pop-scroll">${m.visits.map(visitHTML).join('')}</div>`
-      : '';
-    const noRecords = (!m && !dataUnavailable) ? `<div class="pop-empty">No maintenance records for this station.</div>` : '';
-
-    return `
-      <div class="pop-title">${MCO.escapeHTML(s.name || stationId)}</div>
-      <div class="pop-sub">${MCO.escapeHTML(stationId)}${s.sub_network ? ` · ${MCO.escapeHTML(s.sub_network)}` : ''}</div>
-      <div><span class="pop-pill ${pill.cls}">${pill.lbl}</span></div>
-      ${summary}
-      ${visits}
-      ${noRecords}
-      <div class="pop-links"><a href="${DASH_URL(stationId)}" target="_blank" rel="noopener">Open dashboard →</a></div>
-    `;
+    if (m && m.visits && m.visits.length) {
+      body.appendChild(el('div', 'pop-section-title', 'Visits'));
+      const scroll = el('div', 'pop-scroll');
+      for (const v of m.visits) scroll.appendChild(visitEl(v));
+      body.appendChild(scroll);
+    }
+    if (!m && !dataUnavailable) body.appendChild(el('div', 'pop-empty', 'No maintenance records for this station.'));
+    return body;
+  }
+  // The station detail as DOM: the kit's popup shell (title, mono subtitle,
+  // dashboard action through safeUrl) with this map's visit history inside.
+  // No API string ever reaches setHTML/innerHTML (HOUSE-STYLE §7).
+  function stationContent(stationId) {
+    const s = stationById.get(stationId);
+    const frag = MCO.map.popupContent({
+      title: s.name || stationId,
+      subtitle: `${stationId}${s.sub_network ? ` · ${s.sub_network}` : ''}`,
+      actions: [{ label: 'Open dashboard →', href: DASH_URL(stationId) }],
+    });
+    const root = frag.querySelector('.mco-popup');
+    root.insertBefore(stationBodyEl(stationId), root.querySelector('.mco-popup-actions'));
+    return frag;
   }
 
   function openPopupFor(stationId, lngLat) {
@@ -1148,7 +1191,7 @@
     _selectedStation = stationId;
     const p = new maplibregl.Popup({ closeOnClick: false, maxWidth: '340px', offset: 12 })
       .setLngLat(lngLat || [s.longitude, s.latitude])
-      .setHTML(popupHTML(stationId))
+      .setDOMContent(stationContent(stationId))
       .addTo(map);
     p.on('close', () => {
       if (_suppressNextPopupClose) { _suppressNextPopupClose = false; return; }
