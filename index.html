@@ -366,7 +366,12 @@
 <!-- WCAG 2.4.1 — first focusable element on the page, jumps past the navbar. -->
 <a class="mco-skip-link" href="#main">Skip to map</a>
 
-<header id="navbar" class="mco-navbar">
+<!-- data-rail (kit 0.10.0): on a landscape phone (the landscape half of the
+     compact query, ~750x342) the bar becomes a 56px left rail and the rest
+     of it opens as a drawer beside the rail (MCO.initNavRail). Elsewhere
+     .mco-rail is display:none and .mco-nav-drawer is display:contents, so
+     the bar lays out exactly as before. -->
+<header id="navbar" class="mco-navbar" data-rail>
   <a href="https://climate.umt.edu" target="_blank" rel="noopener noreferrer"
      class="logo-link" aria-label="Montana Climate Office">
     <!-- Vendored, not hot-linked: img-src is enumerated in the CSP above, and a
@@ -374,8 +379,23 @@
     <img src="assets/mco-logo.png" alt="" class="logo-img" width="40" height="40">
   </a>
 
+  <div class="mco-rail">
+    <button type="button" class="nav-btn icon-only" id="btn-rail-menu" aria-label="Menu"
+            aria-controls="nav-drawer" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <button type="button" class="nav-btn icon-only" id="btn-rail-search" aria-label="Search stations">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </button>
+  </div>
+
   <div class="nav-divider" aria-hidden="true"></div>
 
+  <div class="mco-nav-drawer" id="nav-drawer">
   <div class="brand">
     <h1 class="brand-title">Mesonet Station Maintenance</h1>
     <span class="brand-subtitle">A service of the Montana Climate Office</span>
@@ -465,7 +485,9 @@
     </button>
     <button type="button" class="nav-btn mco-btn-info" id="btn-info" aria-label="About this map">?</button>
   </div>
+  </div><!-- /.mco-nav-drawer -->
 </header>
+<div class="mco-scrim" id="rail-scrim" aria-hidden="true" hidden></div>
 
 <main id="main" tabindex="-1">
 <div id="map-container">

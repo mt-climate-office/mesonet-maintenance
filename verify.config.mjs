@@ -158,6 +158,25 @@ export default {
       check('theme toggle cycles dark -> light -> high contrast -> dark; HC repaints dots', ok, JSON.stringify(seen));
       await close();
     }
+    // Landscape phone (750x342): the bar is a 56px rail; the menu opens the
+    // drawer (focus in, <main> inert), Esc returns focus to the toggle, and
+    // "/" opens the drawer on the search field.
+    {
+      const { page, close } = await open('', { ready: dataReady, viewport: { name: 'land', width: 750, height: 342, touch: true } });
+      const geo = await page.evaluate(() => [document.getElementById('navbar').getBoundingClientRect().width, document.getElementById('map').getBoundingClientRect().height]);
+      await page.click('#btn-rail-menu');
+      await page.waitForTimeout(400);
+      const o = await page.evaluate(() => [document.getElementById('nav-drawer').contains(document.activeElement), document.getElementById('main').inert]);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const c = await page.evaluate(() => [document.activeElement?.id, document.getElementById('main').inert]);
+      await page.keyboard.press('/');
+      await page.waitForTimeout(400);
+      const sl = await page.evaluate(() => document.activeElement?.id);
+      check('750x342: rail (56px, map full height); drawer focus/inert/Esc; "/" -> search',
+        geo[0] <= 60 && geo[1] >= 330 && o[0] && o[1] && c[0] === 'btn-rail-menu' && !c[1] && sl === 'search-input', JSON.stringify({ geo, o, c, sl }));
+      await close();
+    }
     // Color mode: segmented buttons at 1440, a <select> at <=1060 — one value.
     {
       const { page, close } = await open('', { ready: dataReady });

@@ -982,8 +982,9 @@
     label: 'Stations',
     limit: 8,
     onSelect: (id) => {
-      // In the compact overlay, dismiss the bar; the popup takes over.
-      if (searchCtl.isOpen()) searchCtl.close({ restoreFocus: false });
+      // Rail drawer or compact overlay: dismiss it; the popup takes over.
+      if (rail.isOpen()) rail.close({ restoreFocus: false });
+      else if (searchCtl.isOpen()) searchCtl.close({ restoreFocus: false });
       else searchInput.blur();
       flyToAndOpen(id);
     },
@@ -1008,6 +1009,17 @@
       searchCtl.close();
     }
   });
+
+  // ── Landscape-phone rail (kit 0.10.0) ────────────────────────────────────
+  // MCO.initNavRail owns the drawer: focus in, the page inert, Esc / scrim /
+  // toggle to close, focus back to the toggle. The rail's search button is a
+  // hot control: it opens the drawer on the search field.
+  const rail = MCO.initNavRail({
+    toggle: document.getElementById('btn-rail-menu'),
+    drawer: document.getElementById('nav-drawer'),
+    scrim: document.getElementById('rail-scrim'),
+  });
+  document.getElementById('btn-rail-search').addEventListener('click', () => rail.open(searchInput));
 
   // With ?kbd=off the '/' shortcut is disabled, so advertising it would be a
   // lie. (The kit already hides this hint inside the compact overlay bar.)
@@ -1606,8 +1618,10 @@
         t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
       if (inField) return;
       e.preventDefault();
-      // When the field is collapsed the overlay has to open first — otherwise
-      // '/' focuses an input that is display:none and the keystroke is lost.
+      // In rail mode the field lives in the closed drawer, and when it is
+      // collapsed the overlay has to open first: otherwise '/' focuses an
+      // input that is display:none and the keystroke is lost.
+      if (rail.isRail()) { rail.open(searchInput); return; }
       if (searchCtl.isCollapsed()) { searchCtl.open(); return; }
       searchInput.focus();
       searchInput.select();
