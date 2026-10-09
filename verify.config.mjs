@@ -70,6 +70,26 @@ export default {
       check(`station dots repaint after a theme flip (${n2} px)`, n2 > 300, String(n2));
       await close();
     }
+    // Legend: click hides a category (and drops it from the map + URL);
+    // Shift+Enter isolates.
+    {
+      const { page, close } = await open('?legend=open', { ready: dataReady });
+      const row = page.locator('#legend-rows [data-key="as_needed"]');
+      await row.click();
+      await page.waitForTimeout(600);
+      const st = await page.evaluate(() => ({
+        pressed: document.querySelector('#legend-rows [data-key="as_needed"]').getAttribute('aria-pressed'),
+        q: location.search,
+        rows: document.querySelectorAll('#sr-station-rows tr').length,
+      }));
+      check('legend click hides a category (aria-pressed=false, cat- in URL)', st.pressed === 'false' && /cat-compliance=/.test(st.q), JSON.stringify(st));
+      await page.locator('#legend-rows [data-key="visited"]').focus();
+      await page.keyboard.press('Shift+Enter');
+      await page.waitForTimeout(300);
+      const iso = await page.evaluate(() => [...document.querySelectorAll('#legend-rows [data-key]')].map((r) => r.dataset.key + ':' + r.getAttribute('aria-pressed')).join(','));
+      check('Shift+Enter isolates a legend category', /visited:true/.test(iso) && !/(overdue|new|as_needed):true/.test(iso), iso);
+      await close();
+    }
     // Deep link opens the popup, and its visit photos actually load.
     {
       const { page, close, problems } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, settleMs: 500 });

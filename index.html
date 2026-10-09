@@ -342,24 +342,8 @@
       left: 12px;
       min-width: 200px;
     }
-    .legend-row {
-      display: flex; align-items: center; gap: 7px;
-      padding: 3px 6px; margin: 0;
-      width: 100%; text-align: left;
-      background: none; border: 0; font: inherit; color: inherit;
-      border-radius: 4px; cursor: pointer;
-      transition: background var(--transition), opacity var(--transition);
-    }
-    /* Hover and keyboard focus share the background tint, but the focus RING
-       is the kit's universal :focus-visible rule — the old `outline: none`
-       here removed it and left keyboard users with only a faint tint to tell
-       them where they were. */
-    .legend-row:hover, .legend-row:focus-visible { background: var(--accent-hover); }
-    .legend-row.off { opacity: 0.4; }
-    .legend-row.off .legend-lbl { text-decoration: line-through; }
-    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border-glass); }
-    .legend-lbl { font-size: 0.74rem; color: var(--text-secondary); white-space: nowrap; flex: 1; }
-    .legend-count { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-muted); flex-shrink: 0; }
+    /* Rows are the kit's .mco-legend-row (MCO.initLegendToggles); only the
+       hint line under them is this map's. */
     .legend-hint {
       margin-top: 6px; padding: 0 4px;
       font-size: 0.62rem; font-style: italic;
@@ -530,7 +514,6 @@
     @media (hover: none) {
       .chip, input[type="search"] { min-height: 40px; }
       #search-dropdown li { min-height: 40px; padding: 10px 8px; }
-      .legend-row { min-height: 40px; padding: 7px 6px; }   /* 40px: HOUSE-STYLE §5.5 (0.9.0's 390px gate) */
       /* Popup controls the 390px touch gate found (kit 0.9.0): the tasks
          disclosure and the dashboard link were 20px tall. */
       .visit-tasks > summary, .pop-links a { min-height: 40px; }
