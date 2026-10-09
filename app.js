@@ -1148,7 +1148,10 @@
     if (!arr || !arr.length) return '';
     return arr.map(t => {
       const c = TRIP_COLORS[t] || TRIP_COLORS['Other'];
-      return `<span class="trip-chip" style="border-color:${c};color:${c};background:${c}22">${MCO.escapeHTML(t)}</span>`;
+      // The category color marks the border and a light tint; the TEXT stays
+      // --text-primary (CSS). Colored text failed 1.4.3 — Maintenance teal on
+      // the dark popup surface measured under 4.5:1.
+      return `<span class="trip-chip" style="border-color:${c};background:${c}22">${MCO.escapeHTML(t)}</span>`;
     }).join(' ');
   }
   function visitHTML(v) {

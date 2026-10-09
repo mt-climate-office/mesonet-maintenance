@@ -421,7 +421,8 @@
     .visit-date { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); font-weight: 600; }
     .trip-chip {
       font-size: 0.6rem; font-weight: 600; padding: 1px 6px; border-radius: 999px;
-      background: var(--accent-hover); border: 1px solid var(--accent); color: var(--accent-light);
+      background: var(--accent-hover); border: 1px solid var(--accent-line);
+      color: var(--text-primary);   /* never the category color: 1.4.3 (see tripChips) */
     }
     .visit-who  { color: var(--text-secondary); margin-top: 2px; }
     .visit-who .lbl { color: var(--text-muted); }
@@ -529,7 +530,10 @@
     @media (hover: none) {
       .chip, input[type="search"] { min-height: 40px; }
       #search-dropdown li { min-height: 40px; padding: 10px 8px; }
-      .legend-row { min-height: 36px; padding: 7px 6px; }
+      .legend-row { min-height: 40px; padding: 7px 6px; }   /* 40px: HOUSE-STYLE §5.5 (0.9.0's 390px gate) */
+      /* Popup controls the 390px touch gate found (kit 0.9.0): the tasks
+         disclosure and the dashboard link were 20px tall. */
+      .visit-tasks > summary, .pop-links a { min-height: 40px; }
     }
   </style>
 </head>
