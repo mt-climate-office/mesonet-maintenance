@@ -7,7 +7,7 @@ the API and the CDN-pinned libraries in `index.html`.
 ## House style
 
 This app consumes mco-web-style (pinned + SRI in `index.html`; currently
-**v0.9.0** — check the tag in that file rather than trusting this line). Design
+**v0.10.0** — check the tag in that file rather than trusting this line). Design
 tokens, a11y mandates, and interaction conventions: see HOUSE-STYLE.md in
 https://github.com/mt-climate-office/mco-web-style — tokens only (no raw hexes),
 `--accent` is fill-only, `aria-pressed` drives toggle styling, canvas data needs
