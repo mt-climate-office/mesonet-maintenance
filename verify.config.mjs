@@ -141,6 +141,23 @@ export default {
       }
       await ctx.close();
     }
+    // Color mode: segmented buttons at 1440, a <select> at <=1060 — one value.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      await page.locator('#mode-seg [data-value="timesince"]').click();
+      await page.waitForTimeout(300);
+      const a = await page.evaluate(() => ({ q: location.search, t: document.getElementById('legend-title').textContent, sel: document.getElementById('mode-select').value }));
+      await page.setViewportSize({ width: 1000, height: 800 });
+      await page.waitForTimeout(400);
+      const vis = await page.evaluate(() => [document.getElementById('mode-seg').hidden, document.getElementById('mode-select').hidden]);
+      await page.selectOption('#mode-select', 'triptype');
+      await page.waitForTimeout(300);
+      const b = await page.evaluate(() => ({ q: location.search, t: document.getElementById('legend-title').textContent, pressed: document.querySelector('#mode-seg [aria-pressed="true"]')?.dataset.value }));
+      check('mode: buttons at 1440, <select> at 1000, mirrored, legend + ?mode= follow',
+        /mode=timesince/.test(a.q) && a.sel === 'timesince' && /Since last/.test(a.t) && vis[0] && !vis[1] && /mode=triptype/.test(b.q) && /trip type/i.test(b.t) && b.pressed === 'triptype',
+        JSON.stringify({ a, vis, b }));
+      await close();
+    }
     // Legend: click hides a category (and drops it from the map + URL);
     // Shift+Enter isolates.
     {

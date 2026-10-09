@@ -1584,20 +1584,23 @@
     }
   });
   // ── Mode toggle ──────────────────────────────────────────────────────────
-  for (const btn of document.querySelectorAll('.seg-btn[data-mode]')) {
-    btn.setAttribute('aria-pressed', btn.dataset.mode === activeMode ? 'true' : 'false');
-    btn.addEventListener('click', () => {
-      if (btn.dataset.mode === activeMode) return;
-      activeMode = btn.dataset.mode;
-      MCO.lsSet('mco-maint-mode', activeMode);
-      for (const b of document.querySelectorAll('.seg-btn[data-mode]')) {
-        b.setAttribute('aria-pressed', b.dataset.mode === activeMode ? 'true' : 'false');
-      }
-      refreshDotColors();
-      applyAllFilters();  // category filter belongs to the active mode
-      pushState();
-    });
+  // Segmented buttons above 1060px, a <select> at and below it
+  // (MCO.initSegmentedFallback, kit 0.9.0): one value, each mirrors the
+  // other, and focus follows across a breakpoint flip.
+  function setMode(mode) {
+    if (!MODES[mode] || mode === activeMode) return;
+    activeMode = mode;
+    MCO.lsSet('mco-maint-mode', activeMode);
+    refreshDotColors();
+    applyAllFilters();  // category filter belongs to the active mode
+    pushState();
   }
+  const modeCtl = MCO.initSegmentedFallback({
+    group: document.getElementById('mode-seg'),
+    select: document.getElementById('mode-select'),
+    onChange: setMode,
+  });
+  modeCtl.set(activeMode);
 
   // ── Refresh (manual data reload) ─────────────────────────────────────────
   // (A manual refresh doesn't refly to the deep-linked station: loadAll

@@ -194,7 +194,7 @@
       transition: opacity 0.15s;
     }
     /* Hide the / hint once the user has focused the search (or while typing). */
-    .mco-search:focus-within .search-kbd { opacity: 0; }
+    .mco-search:focus-within .search-kbd { opacity: 0; }   /* kit-override (scoped): only hides this app's / hint; no .mco-search style changes */
 
     /* ── Sub-network chips (navbar toggles) ─────────────────────────────────
        The kit's .mco-chips / .mco-chip (0.9.0): pressed is a tint plus a ✓,
@@ -316,25 +316,37 @@
        are hidden visually, not removed, so the <h1> outline survives). This map
        adds only its own controls break.
 
-       Below ~1200px the primary controls (search + mode + networks) drop to a
-       dedicated second row; row 1 keeps branding on the left and
-       refresh/labels/theme/info on the right. CSS `order` swaps the visual
-       position without disturbing tab order — search stays keyboard-reachable
-       early via the / shortcut. 1200 rather than the kit's 1060 because this
-       bar carries a segmented control, chips, a search field and four nav
-       buttons. */
-    @media (max-width: 1200px) {
-      .nav-meta  { order: 1; }
-      .controls  { order: 2; flex-basis: 100%; margin-left: 0; }
+       At <=1060px (the kit's ladder rung) the color-mode segmented group
+       becomes a <select> (MCO.initSegmentedFallback). */
+    /* kit-override: the primary controls take a whole second row at the
+       kit's 1400px rung. This bar needs ~1290px in one row: lockup 280,
+       search 220, the mode group 230, chips 220, and stamp plus four
+       buttons 300. Shedding the mode group to a <select> at 1060 saves
+       ~110px, which isn't enough. The old break sat at an off-ladder 1200px,
+       so from 1201 to ~1299px the bar wrapped on its own and stranded the
+       nav buttons on a ragged second row (measured 2026-10-09: 94px tall,
+       both engines). Below 1400, row 1 is branding plus the nav buttons and
+       row 2 the controls (CSS order; tab order is unchanged). */
+    @media (max-width: 1400px) {
+      .nav-meta  { order: 1; }                                   /* kit-override: 2-row bar, see above */
+      .controls  { order: 2; flex-basis: 100%; margin-left: 0; } /* kit-override: 2-row bar, see above */
     }
+    .mode-select {
+      height: 32px; padding: 0 28px 0 10px;
+      background-color: var(--input-bg); color: var(--text-primary);
+      border: 1px solid var(--ctrl-border); border-radius: var(--radius-md);
+      font: inherit; font-size: 0.82rem; cursor: pointer;
+    }
+    .mode-select:hover { border-color: var(--accent-line); }
+    .mode-select[hidden] { display: none; }
     @media (max-width: 1060px) {
-      .nav-meta { gap: 0.3rem; }
+      .nav-meta { gap: 0.3rem; }   /* kit-override: tighter nav buttons beside the lockup on tablets */
     }
     /* At ≤640px the kit collapses the search field into its disclosure button,
        so the field's own width rules no longer apply: it is either display:none
        or flexed to fill the overlay bar. */
     @media (max-width: 640px) {
-      .refresh-status { display: none; }   /* reclaim space on phones */
+      .refresh-status { display: none; }   /* kit-override: reclaim space on phones; the stamp is decorative */
     }
     /* WCAG 2.5.5 — comfortable touch targets on touch-only devices. The kit
        already sizes .nav-btn, .seg-btn, .mco-btn-info and .mco-panel-toggle;
@@ -343,6 +355,7 @@
       /* Popup controls the 390px touch gate found (kit 0.9.0): the tasks
          disclosure was 20px tall. (The dashboard link is now a kit .nav-btn.) */
       .visit-tasks > summary { min-height: 40px; }
+      .mode-select { height: 40px; }   /* height, not min-height: WebKit ignores the latter on <select> */
     }
   </style>
 </head>
@@ -380,11 +393,18 @@
     </div>
 
     <!-- Mode (radio): exactly one of these is active. Joined segmented buttons. -->
-    <div class="seg-btns" role="group" aria-label="Color mode">
-      <button type="button" class="nav-btn seg-btn" data-mode="compliance" aria-pressed="true">Compliance</button>
-      <button type="button" class="nav-btn seg-btn" data-mode="timesince"  aria-pressed="false">Time since</button>
-      <button type="button" class="nav-btn seg-btn" data-mode="triptype"   aria-pressed="false">Trip type</button>
+    <div class="seg-btns" id="mode-seg" role="group" aria-label="Color mode">
+      <button type="button" class="nav-btn seg-btn" data-value="compliance" aria-pressed="true">Compliance</button>
+      <button type="button" class="nav-btn seg-btn" data-value="timesince"  aria-pressed="false">Time since</button>
+      <button type="button" class="nav-btn seg-btn" data-value="triptype"   aria-pressed="false">Trip type</button>
     </div>
+    <!-- The same choice at <=1060px (MCO.initSegmentedFallback). -->
+    <label for="mode-select" class="sr-only">Color mode</label>
+    <select id="mode-select" class="mode-select" hidden>
+      <option value="compliance">Compliance</option>
+      <option value="timesince">Time since</option>
+      <option value="triptype">Trip type</option>
+    </select>
 
     <!-- Networks (multi-select): any combination. Pills with a check on active. -->
     <div class="mco-chips" id="subnet-filters" role="group" aria-label="Sub-network filter"></div>
