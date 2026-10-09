@@ -61,6 +61,8 @@ export default {
     // A hidden category with the legend open: the 390 default starts with
     // the legend collapsed, so without this its rows are never measured.
     { name: 'legend-off', query: '?cat-compliance=visited+new&legend=open', ready: dataReady },
+    // Every category hidden: the .mco-empty callout over the map.
+    { name: 'empty-state', query: '?cat-compliance=', ready: () => dataReady() && !document.getElementById('empty-state').hidden },
     // A station popup open (visit history, pills, photos, links): it only
     // exists after a click, so a load-only scan never audits it.
     { name: 'station-popup', query: '?station=aceashla&lng=-106.41&lat=45.6&zoom=9', ready: () => !!document.querySelector('.maplibregl-popup .visit-photo-thumb') },

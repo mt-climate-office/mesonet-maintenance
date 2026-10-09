@@ -915,16 +915,21 @@
       if (emptyStateEl) emptyStateEl.hidden = true;
       return;
     }
+    // [lead (bold), rest] — static strings, set as text.
     let msg = null;
     if (activeNetworks.size === 0) {
-      msg = '<strong>No networks selected.</strong> Click HydroMet or AgriMet to show stations.';
+      msg = ['No networks selected.', ' Click HydroMet or AgriMet to show stations.'];
     } else if (currentCats().size === 0) {
-      msg = '<strong>All legend categories hidden.</strong> Click a legend row to show stations.';
+      msg = ['All legend categories hidden.', ' Click a legend row to show stations.'];
     } else if (bucketMembers.size === 0) {
-      msg = 'No stations match the current filters.';
+      msg = ['', 'No stations match the current filters.'];
     }
     if (msg) {
-      emptyStateEl.innerHTML = `<div class="empty-state-card">${msg}</div>`;
+      const p = document.createElement('p');
+      p.style.margin = '0';
+      if (msg[0]) { const b = document.createElement('strong'); b.textContent = msg[0]; p.appendChild(b); }
+      p.append(msg[1]);
+      emptyStateEl.replaceChildren(p);
       emptyStateEl.hidden = false;
     } else {
       emptyStateEl.hidden = true;
