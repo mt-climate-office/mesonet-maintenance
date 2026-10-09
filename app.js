@@ -105,7 +105,7 @@
   const legendRowsEl  = document.getElementById('legend-rows');
   const legendTitleEl = document.getElementById('legend-title');
   const searchInput   = document.getElementById('search-input');
-  const searchDropdown= document.getElementById('search-dropdown');
+  const searchList    = document.getElementById('search-dropdown');
   const infoModal     = document.getElementById('info-modal');
   const dataBannerEl  = document.getElementById('data-banner');
 
@@ -668,7 +668,7 @@
 
       indexStations();
       buildFilterUI();
-      populateSearch();
+      searchBox.refresh();
       rebuildSource();
       applyAllFilters();   // re-apply now that activeNetworks is populated
       renderLegend();
@@ -695,7 +695,7 @@
       // Still try to render whatever we have.
       indexStations();
       buildFilterUI();
-      populateSearch();
+      searchBox.refresh();
       rebuildSource();
       applyAllFilters();
       renderLegend();
@@ -914,104 +914,26 @@
     }
   }
 
-  // ── Search (custom listbox dropdown + flyTo + popup) ─────────────────────
-  // Custom rather than native <datalist> so the popup honors the app theme.
-  let _searchSorted = [];
-  let _activeSearchIndex = -1;
-  const SEARCH_MAX_RESULTS = 8;
-
-  function populateSearch() {
-    _searchSorted = [...stations].filter(s => stationById.has(s.station))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }
-
-  function matchScore(s, q) {
-    const n = (s.name || '').toLowerCase();
-    const id = (s.station || '').toLowerCase();
-    if (n === q || id === q)   return 0;
-    if (n.startsWith(q))       return 1;
-    if (id.startsWith(q))      return 2;
-    if (n.includes(q))         return 3;
-    if (id.includes(q))        return 4;
-    return Infinity;
-  }
-
-  function showSearchDropdown(rawQuery) {
-    const q = rawQuery.trim().toLowerCase();
-    if (!q) { hideSearchDropdown(); return; }
-    const matches = _searchSorted
-      .map(s => ({ s, score: matchScore(s, q) }))
-      .filter(m => m.score < Infinity)
-      .sort((a, b) => a.score - b.score || (a.s.name || '').localeCompare(b.s.name || ''))
-      .slice(0, SEARCH_MAX_RESULTS)
-      .map(m => m.s);
-    searchDropdown.innerHTML = '';
-    if (matches.length === 0) {
-      const li = document.createElement('li');
-      li.className = 'empty';
-      li.setAttribute('aria-disabled', 'true');
-      li.textContent = `No stations match "${rawQuery.trim()}"`;
-      searchDropdown.appendChild(li);
-      searchDropdown.hidden = false;
-      searchInput.setAttribute('aria-expanded', 'true');
-      _activeSearchIndex = -1;
-      return;
-    }
-    for (const s of matches) {
-      const li = document.createElement('li');
-      li.setAttribute('role', 'option');
-      li.dataset.stationId = s.station;
-      li.id = `search-opt-${s.station}`;
-      const name = document.createElement('span');
-      name.className = 'search-name';
-      name.textContent = s.name;
-      const meta = document.createElement('span');
-      meta.className = 'search-meta';
-      meta.textContent = `${s.station} · ${s.sub_network || '—'}`;
-      li.appendChild(name);
-      li.appendChild(meta);
-      // mousedown (not click) so the option commits before the input's blur.
-      li.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        selectStation(s.station);
-      });
-      searchDropdown.appendChild(li);
-    }
-    searchDropdown.hidden = false;
-    searchInput.setAttribute('aria-expanded', 'true');
-    _activeSearchIndex = -1;
-    searchInput.removeAttribute('aria-activedescendant');
-  }
-
-  function hideSearchDropdown() {
-    searchDropdown.hidden = true;
-    searchInput.setAttribute('aria-expanded', 'false');
-    _activeSearchIndex = -1;
-    searchInput.removeAttribute('aria-activedescendant');
-  }
-
-  function selectStation(stationId) {
-    hideSearchDropdown();
-    flyToAndOpen(stationId);
-    searchInput.value = '';
-    searchInput.blur();
-  }
-
-  function setActiveSearchItem(idx) {
-    const items = searchDropdown.querySelectorAll('li');
-    if (!items.length) return;
-    if (idx < 0)               idx = items.length - 1;
-    if (idx >= items.length)   idx = 0;
-    _activeSearchIndex = idx;
-    items.forEach((it, i) => it.classList.toggle('active', i === idx));
-    items[idx].scrollIntoView({ block: 'nearest' });
-    searchInput.setAttribute('aria-activedescendant', items[idx].id);
-  }
-
-  searchInput.addEventListener('input',  () => showSearchDropdown(searchInput.value));
-  searchInput.addEventListener('focus',  () => { if (searchInput.value) showSearchDropdown(searchInput.value); });
-  // Delay so a click/mousedown on an option can fire before we hide the list.
-  searchInput.addEventListener('blur',   () => setTimeout(hideSearchDropdown, 120));
+  // ── Search (kit combobox + flyTo + popup) ────────────────────────────────
+  // MCO.initSearchBox (kit 0.8.0) is the APG combobox this file used to
+  // hand-roll: role/aria wiring, ranking, arrow/Home/End/Enter/Esc, the
+  // "no matches" row as a disabled option, and a debounced count announcement.
+  const searchBox = MCO.initSearchBox({
+    input: searchInput,
+    listbox: searchList,
+    items: () => stations
+      .filter((s) => stationById.has(s.station))
+      .map((s) => ({ id: s.station, label: s.name || s.station, meta: `${s.station} · ${s.sub_network || '—'}` })),
+    value: () => _selectedStation,
+    label: 'Stations',
+    limit: 8,
+    onSelect: (id) => {
+      // In the compact overlay, dismiss the bar; the popup takes over.
+      if (searchCtl.isOpen()) searchCtl.close({ restoreFocus: false });
+      else searchInput.blur();
+      flyToAndOpen(id);
+    },
+  });
 
   // Below 640px the field collapses into a disclosure button grouped with the
   // other nav buttons and reopens as a full-width overlay bar under the navbar.
@@ -1020,7 +942,17 @@
     wrap:    document.getElementById('search-wrap'),
     toggle:  document.getElementById('btn-search-toggle'),
     input:   searchInput,
-    onClose: hideSearchDropdown,
+    onClose: () => searchBox.close(),
+  });
+  // The kit's combobox consumes Esc while it has something to close (the
+  // list, then the text). Once it passes Esc through, the compact overlay
+  // closes and hands focus back to its toggle.
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !e.defaultPrevented && searchCtl.isOpen()) {
+      e.preventDefault();
+      e.stopPropagation();
+      searchCtl.close();
+    }
   });
 
   // With ?kbd=off the '/' shortcut is disabled, so advertising it would be a
@@ -1526,34 +1458,6 @@
       searchInput.select();
     }
   });
-  // Keyboard nav inside the custom dropdown.
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      searchInput.value = '';
-      hideSearchDropdown();
-      // In the collapsed overlay, Escape should dismiss the bar and hand focus
-      // back to the toggle — blurring alone would strand focus on the body
-      // behind a still-open overlay.
-      if (searchCtl.isOpen()) { searchCtl.close(); return; }
-      searchInput.blur();
-      return;
-    }
-    if (searchDropdown.hidden) return;
-    const items = searchDropdown.querySelectorAll('li');
-    if (!items.length) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveSearchItem(_activeSearchIndex + 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveSearchItem(_activeSearchIndex - 1);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const idx = _activeSearchIndex >= 0 ? _activeSearchIndex : 0;
-      selectStation(items[idx].dataset.stationId);
-    }
-  });
-
   // ── Mode toggle ──────────────────────────────────────────────────────────
   for (const btn of document.querySelectorAll('.seg-btn[data-mode]')) {
     btn.setAttribute('aria-pressed', btn.dataset.mode === activeMode ? 'true' : 'false');

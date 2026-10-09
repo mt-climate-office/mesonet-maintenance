@@ -90,6 +90,17 @@ export default {
       check('Shift+Enter isolates a legend category', /visited:true/.test(iso) && !/(overdue|new|as_needed):true/.test(iso), iso);
       await close();
     }
+    // Search: type, Enter picks the best match, the map flies and opens it.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      await page.locator('#search-input').fill('ashla');
+      await page.waitForTimeout(300);
+      const opts = await page.locator('#search-dropdown [role="option"]:not([aria-disabled])').count();
+      await page.keyboard.press('Enter');
+      const opened = await page.waitForFunction(() => /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), null, { timeout: 15000 }).then(() => true, () => false);
+      check(`search lists matches (${opts}) and Enter opens that station`, opts > 0 && opened);
+      await close();
+    }
     // Deep link opens the popup, and its visit photos actually load.
     {
       const { page, close, problems } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, settleMs: 500 });
