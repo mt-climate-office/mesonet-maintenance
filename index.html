@@ -233,11 +233,11 @@
       display: inline-block; font-size: 0.64rem; font-weight: 600; padding: 2px 8px;
       border-radius: 999px; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.04em;
     }
-    .pop-pill.visited   { background: var(--c-visited);  color: #000000; }  /* 5.08:1 */
-    .pop-pill.overdue   { background: var(--c-overdue);  color: #ffffff; }  /* 5.48:1 */
-    .pop-pill.new       { background: var(--c-new);      color: #1a1a2e; }  /* 7.03:1 */
-    .pop-pill.as_needed { background: var(--c-asneeded); color: #1a1a2e; }  /* 4.93:1 */
-    .pop-pill.nodata    { background: var(--c-nodata);   color: #1a1a2e; }  /* 6.71:1 */
+    .pop-pill.visited   { background: var(--c-visited);  color: #000000; }  /* contrast 5.08:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.overdue   { background: var(--c-overdue);  color: #ffffff; }  /* contrast 5.48:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.new       { background: var(--c-new);      color: #1a1a2e; }  /* contrast 7.03:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.as_needed { background: var(--c-asneeded); color: #1a1a2e; }  /* contrast 4.93:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.nodata    { background: var(--c-nodata);   color: #1a1a2e; }  /* contrast 6.71:1 on its fill (WCAG 1.4.3) */
     /* Label/value pairs are the kit's .mco-facts. A state that needs a
        sentence instead ("AgriMet station — visited as needed…") gets this
        note. It is plain text on the popup surface, not --text-muted on a
@@ -295,14 +295,14 @@
       display: block; max-width: min(1200px, calc(100vw - 4rem));
       max-height: calc(100dvh - 5rem); border-radius: 6px; object-fit: contain;
     }
-    .lightbox-caption { text-align: center; color: #ccc; font-size: 0.8rem; margin-top: 0.5rem; }
+    .lightbox-caption { text-align: center; color: #ccc; font-size: 0.8rem; margin-top: 0.5rem; }   /* contrast ~11:1 on the 88% black ::backdrop, every theme (WCAG 1.4.3) */
     .lightbox-close {
       position: absolute; top: -2rem; right: 0; background: none; border: none;
-      color: #fff; font-size: 1.75rem; line-height: 1; cursor: pointer; padding: 0 0.25rem;
+      color: #fff; font-size: 1.75rem; line-height: 1; cursor: pointer; padding: 0 0.25rem;   /* contrast ~18:1 on the 88% black ::backdrop (WCAG 1.4.11) */
     }
     .lightbox-nav {
       position: absolute; top: 50%; transform: translateY(-50%);
-      background: rgba(0,0,0,0.45); border: none; color: #fff;
+      background: rgba(0,0,0,0.45); border: none; color: #fff;   /* over a photo: contrast >= 3:1 against any pixel under the 45% black chip (WCAG 1.4.11) */
       font-size: 2rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.7rem;
       border-radius: 6px; transition: background var(--transition);
     }
@@ -574,6 +574,7 @@
         <li><strong>Hover</strong> a dot for its status; <strong>click</strong> for the full visit history + dashboard link.</li>
         <li><strong>Numbered dots</strong> — multiple stations share that location. Hover or tap to fan them out; click one for its details.</li>
         <li><kbd>Esc</kbd> closes any popup or fan-out.</li>
+        <li>Using speech input? Add <code>?kbd=off</code> to the address to turn off the <kbd>/</kbd> shortcut.</li>
       </ul>
     </div>
 
