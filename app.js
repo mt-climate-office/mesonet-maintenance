@@ -1040,14 +1040,31 @@
   // ── Photo lightbox (visit photos) ───────────────────────────────────────
   const _galleries = new Map();   // gallery id → [{thumb, full, filename}]
   let _galleryCounter = 0;
+  // Photo URLs come from the API response (AirTable attachments), so they are
+  // untrusted input to an HTML attribute AND a CSS url(). https only — anything
+  // else (javascript:, data:, a relative path, garbage) is dropped — and the
+  // characters that could end the CSS string or the url() token are
+  // percent-encoded, which is the same URL to the server. The result then goes
+  // through escapeHTML like every other value in this template. Before this, a
+  // `'` or `"` in p.thumb could break out of style="" and inject attributes.
+  function safePhotoUrl(u) {
+    let url;
+    try { url = new URL(String(u)); } catch { return null; }
+    if (url.protocol !== 'https:') return null;
+    return url.href.replace(/['"()\\\s]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+  }
   function photosHTML(arr) {
-    if (!arr || !arr.length) return '';
+    if (!Array.isArray(arr)) return '';
+    const photos = arr
+      .map((p) => p && { thumb: safePhotoUrl(p.thumb), full: safePhotoUrl(p.full), filename: p.filename })
+      .filter((p) => p && p.thumb && p.full);
+    if (!photos.length) return '';
     const gid = 'g' + (_galleryCounter++);
-    _galleries.set(gid, arr);
-    return `<div class="visit-photos">${arr.map((p, i) =>
-      `<button class="visit-photo-thumb" data-gid="${gid}" data-idx="${i}" ` +
-      `style="background-image:url('${p.thumb}')" ` +
-      `aria-label="View photo ${i + 1} of ${arr.length}"${p.filename ? ` title="${MCO.escapeHTML(p.filename)}"` : ''}></button>`
+    _galleries.set(gid, photos);
+    return `<div class="visit-photos">${photos.map((p, i) =>
+      `<button type="button" class="visit-photo-thumb" data-gid="${gid}" data-idx="${i}" ` +
+      `style="background-image:url('${MCO.escapeHTML(p.thumb)}')" ` +
+      `aria-label="View photo ${i + 1} of ${photos.length}"${p.filename ? ` title="${MCO.escapeHTML(p.filename)}"` : ''}></button>`
     ).join('')}</div>`;
   }
   const lightbox = document.getElementById('lightbox');
@@ -1151,7 +1168,7 @@
       summary = `<div class="pop-summary">${base}AgriMet station — visited as needed, not subject to the annual Maintenance requirement.</div>`;
     } else if (m && m.last_qualifying_visit_date) {
       summary = `<div class="pop-summary">Last Maintenance: <strong>${MCO.escapeHTML(fmtDate(m.last_qualifying_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_qualifying_visit_date))})<br>` +
-                `<strong>${m.qualifying_visits_this_year}</strong> Maintenance visit${m.qualifying_visits_this_year === 1 ? '' : 's'} this year</div>`;
+                `<strong>${MCO.escapeHTML(String(m.qualifying_visits_this_year))}</strong> Maintenance visit${m.qualifying_visits_this_year === 1 ? '' : 's'} this year</div>`;
     } else {
       summary = `<div class="pop-summary">No <strong>Maintenance</strong> visit on record${m && m.last_visit_date ? ` (last visit of any type ${MCO.escapeHTML(fmtDate(m.last_visit_date))})` : ''}.</div>`;
     }
