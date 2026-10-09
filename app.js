@@ -874,13 +874,13 @@
     for (const net of allNetworks) {
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'chip';
+      chip.className = 'mco-chip';
       chip.dataset.network = net;
       chip.setAttribute('aria-pressed', activeNetworks.has(net) ? 'true' : 'false');
       const lbl = document.createElement('span');
       lbl.textContent = net;
       const count = document.createElement('span');
-      count.className = 'chip-count';
+      count.className = 'mco-chip-count';
       count.dataset.network = net;
       count.textContent = String(byNet[net] || 0);
       chip.appendChild(lbl);
@@ -1004,7 +1004,7 @@
       // Re-enable its sub-network so the user can see the dot
       activeNetworks.add(s.sub_network);
       MCO.lsSet('mco-maint-networks', JSON.stringify([...activeNetworks]));
-      for (const chip of subnetFiltersEl.querySelectorAll('.chip')) {
+      for (const chip of subnetFiltersEl.querySelectorAll('.mco-chip')) {
         if (chip.dataset.network === s.sub_network) chip.setAttribute('aria-pressed', 'true');
       }
       rebuildSource();

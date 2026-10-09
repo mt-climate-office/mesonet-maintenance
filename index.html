@@ -196,26 +196,11 @@
     /* Hide the / hint once the user has focused the search (or while typing). */
     .mco-search:focus-within .search-kbd { opacity: 0; }
 
-    /* ── Sub-network chips (navbar toggles) ───────────────────────────────── */
-    .chip-group { display: flex; gap: 4px; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 5px;
-      height: 30px; padding: 0 9px;
-      border: 1px solid var(--border); border-radius: 999px;
-      background: none; color: var(--text-secondary);
-      font: inherit; font-size: 0.72rem; font-weight: 600;
-      cursor: pointer; white-space: nowrap;
-      transition: var(--transition);
-    }
-    .chip:hover { border-color: var(--accent-line); color: var(--text-primary); background: var(--accent-hover); }
-    .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent-line); color: var(--text-on-accent); }
-    .chip .chip-count {
-      font-family: var(--font-mono); font-size: 0.65rem;
-      padding: 1px 5px; border-radius: 999px;
-      background: var(--border-glass); color: inherit;
-    }
-    /* Keep the count badge legible when the chip is pressed (accent background). */
-    .chip[aria-pressed="true"] .chip-count { background: rgba(0,0,0,0.28); color: var(--text-on-accent); }
+    /* ── Sub-network chips (navbar toggles) ─────────────────────────────────
+       The kit's .mco-chips / .mco-chip (0.9.0): pressed is a tint plus a ✓,
+       a non-color cue, and 40px on touch. Only the row's nowrap is ours: the
+       group sits in the navbar's control row. */
+    #subnet-filters { flex-wrap: nowrap; }
 
     /* ── Legend (bottom-left, collapsible) ────────────────────────────────── */
     /* The panel shell, its header/title/toggle, the caret rotation and the
@@ -355,7 +340,6 @@
        already sizes .nav-btn, .seg-btn, .mco-btn-info and .mco-panel-toggle;
        what is left here is this map's own controls. */
     @media (hover: none) {
-      .chip { min-height: 40px; }
       /* Popup controls the 390px touch gate found (kit 0.9.0): the tasks
          disclosure was 20px tall. (The dashboard link is now a kit .nav-btn.) */
       .visit-tasks > summary { min-height: 40px; }
@@ -403,7 +387,7 @@
     </div>
 
     <!-- Networks (multi-select): any combination. Pills with a check on active. -->
-    <div class="chip-group" id="subnet-filters" role="group" aria-label="Sub-network filter"></div>
+    <div class="mco-chips" id="subnet-filters" role="group" aria-label="Sub-network filter"></div>
   </div>
 
   <div class="nav-meta">
