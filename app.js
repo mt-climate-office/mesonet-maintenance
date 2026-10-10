@@ -1273,7 +1273,10 @@
   const stationSheet = MCO.initSheet({
     sheet: sheetEl,
     peekHeight: 'auto',
-    inertRoots: MCO.overlay.siblingsOf(sheetEl, [infoModal, document.getElementById('lightbox')]),
+    // A function (kit 0.11.3): resolved each time the full detent goes
+    // modal, so whatever sits beside the sheet then is covered. The two
+    // dialogs stay live: a thumb in the sheet opens the lightbox over it.
+    inertRoots: () => MCO.overlay.siblingsOf(sheetEl, [infoModal, document.getElementById('lightbox')]),
     fallbackFocus: document.getElementById('map'),
     onState: (st) => {
       if (st !== 'closed') { _sheetOpen = true; return; }

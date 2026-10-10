@@ -241,6 +241,12 @@ export default {
       check('grip Enter -> full detent, <main> inert', full.st === 'full' && full.inert, JSON.stringify(full));
       await page.locator('#station-sheet .visit-photo-thumb').first().click();
       const lb = await page.waitForFunction(() => document.getElementById('lightbox').open && document.getElementById('lightbox-img').naturalWidth > 0, null, { timeout: 15000 }).then(() => true, () => false);
+      // Usable over the modal sheet: not inert, and Next steps the gallery.
+      const cap0 = await page.textContent('#lightbox-caption');
+      await page.click('#lightbox-next');
+      await page.waitForTimeout(300);
+      const lbUse = await page.evaluate((c0) => ({ inert: document.getElementById('lightbox').inert || !!document.getElementById('lightbox').closest('[inert]'), stepped: document.getElementById('lightbox-caption').textContent !== c0 }), cap0);
+      check('lightbox over the full sheet is live (not inert) and Next steps the gallery', !lbUse.inert && lbUse.stepped, JSON.stringify(lbUse));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
       const after1 = await page.evaluate(() => ({ lb: document.getElementById('lightbox').open, st: document.getElementById('station-sheet').dataset.state }));
