@@ -26,13 +26,6 @@
   const MAINT_URL    = `${API_BASE}/stations/maintenance/live?type=json`;
   const DASH_URL     = (s) => `https://mesonet.climate.umt.edu/dash/${encodeURIComponent(s)}`;
 
-  // Initial fit (a touch padded around Montana's actual extent). Snapback on
-  // zoom-out uses these same bounds — matching the snowpack-explorer pattern.
-  // The Montana extent and its fit options are kit defaults
-  // (MCO.map.MT_FIT_BOUNDS / MCO.map.FIT_OPTS); aliased here for the few direct
-  // fitBounds/cameraForBounds calls below rather than redeclared.
-  const MT_FIT_BOUNDS = MCO.map.MT_FIT_BOUNDS;
-  const FIT_OPTS      = MCO.map.FIT_OPTS;
 
   // Spider geometry / interaction
   const SPIDER_RADIUS_PX        = 26;     // distance from anchor to spider foot
@@ -70,12 +63,17 @@
     timesince: {
       catKey: 'timeBinKey',
       legendTitle: 'Since last Maintenance',
+      // Kit roma, option B (Kyle, 2026-10-10): MCO.palette.sample('roma', 5,
+      // {from: .1, to: .9, reverse: true}), newest (blue) -> oldest (brown).
+      // The one sample feeds the map paint and the legend swatches
+      // (TIME_SINCE_COLORS below). A diverging ramp has no 3:1 span; the
+      // kit's --dot-stroke outline carries the mark edge (14-21:1).
       cats: [
-        { key: '0',    color: '#2a8a86', label: '< 1 month' },
-        { key: '1',    color: '#84c2a0', label: '1–3 months' },
-        { key: '2',    color: '#f4d88e', label: '3–6 months' },
-        { key: '3',    color: '#d4894a', label: '6–12 months' },
-        { key: '4',    color: '#b8421b', label: '> 1 year' },
+        { key: '0',    label: '< 1 month' },
+        { key: '1',    label: '1–3 months' },
+        { key: '2',    label: '3–6 months' },
+        { key: '3',    label: '6–12 months' },
+        { key: '4',    label: '> 1 year' },
         { key: 'null', color: '#9aa3b3', label: 'Never / no data' },
       ],
     },
@@ -95,6 +93,9 @@
     },
   };
   const MODE_NAMES = Object.keys(MODES);
+  // Time-since bin colors: one sample of the kit's roma (palette 0.12.0).
+  const TIME_SINCE_COLORS = MCO.palette.sample('roma', 5, { from: 0.1, to: 0.9, reverse: true });
+  MODES.timesince.cats.forEach((c, i) => { if (i < TIME_SINCE_COLORS.length) c.color = TIME_SINCE_COLORS[i]; });
 
   const bucketKey = (lat, lon) =>
     `${lat.toFixed(BUCKET_PRECISION)},${lon.toFixed(BUCKET_PRECISION)}`;
@@ -105,19 +106,19 @@
   const legendRowsEl  = document.getElementById('legend-rows');
   const legendTitleEl = document.getElementById('legend-title');
   const searchInput   = document.getElementById('search-input');
-  const searchDropdown= document.getElementById('search-dropdown');
+  const searchList    = document.getElementById('search-dropdown');
   const infoModal     = document.getElementById('info-modal');
-  const dataBannerEl  = document.getElementById('data-banner');
+  const mapContainerEl = document.getElementById('map-container');
 
-  // Push a sentence to the aria-live region so screen-reader users hear
-  // "Station X opened" when a popup is shown via click, search, or deep-link.
-  const srAnnounceEl = document.getElementById('sr-announce');
+  // Tell screen-reader users which station opened when a popup is shown via
+  // click, search, or deep-link. MCO.announce (kit 0.8.0) owns the polite
+  // live region, its clear-then-set (so a repeat is re-read) and de-dupe.
   function announcePopup(stationId) {
     const s = stationById.get(stationId);
-    if (!s || !srAnnounceEl) return;
+    if (!s) return;
     const state = complianceStateFor(s);
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
-    srAnnounceEl.textContent = `${s.name} (${s.station}), ${s.sub_network || 'station'}, ${pill.lbl}.`;
+    MCO.announce(`${s.name} (${s.station}), ${s.sub_network || 'station'}, ${pill.lbl}.`);
   }
 
   // ── Theme ────────────────────────────────────────────────────────────────
@@ -136,15 +137,18 @@
     button:   document.getElementById('btn-theme'),
     iconSun:  document.getElementById('icon-sun'),
     iconMoon: document.getElementById('icon-moon'),
-    onChange: () => {
-      if (!map) { pushState(); return; }   // the library is still loading
-      map.setStyle(MCO.map.cartoStyleUrl());
-      map.once('style.load', () => {
-        addCustomLayers();   // re-add — setStyle wipes our sources/layers
-        rebuildSource();     // repopulate the now-empty stations source
-      });
-      pushState();
-    },
+    // 0.10.0: dark -> light -> high contrast, so high contrast is reachable
+    // from the page, not only from ?theme= or storage.
+    cycle: true,
+    iconContrast: document.getElementById('icon-contrast'),
+  });
+  // React to the theme however it changed (this button, or any other
+  // MCO.setTheme caller): the kit's mco:themechange event (0.9.0), not the
+  // toggle's onChange. The every-style.load handler in wireMapLoad() re-adds
+  // our layers and re-samples the ramp colors for the new theme.
+  document.addEventListener('mco:themechange', () => {
+    if (map) map.setStyle(MCO.map.cartoStyleUrl());
+    writeUrl();
   });
 
   // ── Info modal ───────────────────────────────────────────────────────────
@@ -327,7 +331,7 @@
   // ?kbd=off disables the single-character '/' shortcut (WCAG 2.1.4 — a
   // speech-input user can misfire it just by dictating a sentence). Read up
   // here with the rest of the URL state, not down in the keyboard section:
-  // pushState() emits it and can run during init, which would put a late
+  // writeUrl() emits it and can run during init, which would put a late
   // `const` in its temporal dead zone.
   const kbdShortcuts = getLower('kbd') !== 'off';
 
@@ -664,11 +668,11 @@
       const maint = Array.isArray(maintRaw) ? maintRaw : [];
       dataUnavailable = maint.length === 0;
       maintBySta = new Map(maint.map(m => [m.station, m]));
-      dataBannerEl.hidden = !dataUnavailable;
+      setDataNotice(dataUnavailable);
 
       indexStations();
       buildFilterUI();
-      populateSearch();
+      searchBox.refresh();
       rebuildSource();
       applyAllFilters();   // re-apply now that activeNetworks is populated
       renderLegend();
@@ -682,7 +686,7 @@
         _initStationConsumed = true;
       } else {
         // Push initial URL so it's clean even if the user hasn't interacted yet
-        pushState();
+        writeUrl();
       }
       // First meaningful state is on screen: release the kit's first-paint
       // hold (0.9.0). Idempotent, so Refresh calling it again is harmless.
@@ -690,16 +694,37 @@
     } catch (err) {
       console.error(err);
       dataUnavailable = true;
-      dataBannerEl.hidden = false;
+      setDataNotice(true);
       MCO.showToast(`Error loading data: ${err.message}`);
       // Still try to render whatever we have.
       indexStations();
       buildFilterUI();
-      populateSearch();
+      searchBox.refresh();
       rebuildSource();
       applyAllFilters();
       renderLegend();
       MCO.ready();
+    }
+  }
+  // Maintenance feed down or empty: a warning notice over the map, with
+  // Retry (MCO.notice, kit 0.8.0 — tone word, icon, announcement, dismiss).
+  // The element keeps the id "data-banner": scripts/generate_preview.py
+  // refuses to overwrite the social card while it is visible.
+  let _dataNotice = null;
+  function setDataNotice(on) {
+    if (on && !_dataNotice) {
+      _dataNotice = MCO.notice({
+        tone: 'warning',
+        text: 'Maintenance data unavailable. Showing stations without visit status.',
+        action: { label: 'Retry', onClick: () => refreshData() },
+        container: mapContainerEl, place: 'over',
+        onClose: () => { _dataNotice = null; },
+      });
+      if (_dataNotice.element) _dataNotice.element.id = 'data-banner';
+    } else if (!on && _dataNotice) {
+      const n = _dataNotice;
+      _dataNotice = null;
+      n.close();
     }
   }
   // Only re-consume the deep-link once (initial load); Refresh shouldn't refly.
@@ -812,24 +837,37 @@
   // since hidden-network stations never reach `features`. Rebuilt silently: it
   // is deliberately NOT wired to a live region, because re-announcing the whole
   // table on every repaint would be noise.
+  // MCO.srTable (kit 0.8.0): the wrapper div carries .sr-only, not the
+  // <table>. The old hand-built table had .sr-only on the <table> itself,
+  // which a table ignores for sizing: it laid out ~614px wide, and on a
+  // mobile browser that widened the layout viewport past the screen.
+  const srTwin = MCO.srTable({
+    container: document.getElementById('main'),
+    caption: 'Mesonet stations and their maintenance-visit status',
+    columns: [
+      { key: 'name', label: 'Station', rowHeader: true },
+      { key: 'station', label: 'ID' },
+      { key: 'net', label: 'Sub-network' },
+      { key: 'status', label: 'Status' },
+      { key: 'last', label: 'Last visit' },
+    ],
+    rowKey: (r) => r.station,
+  });
+  srTwin.element.id = 'sr-station-table';
   function rebuildSrTable(features) {
-    const tbody = document.getElementById('sr-station-rows');
-    if (!tbody) return;
     const rows = features
-      .slice()
-      .sort((a, b) => a.properties.name.localeCompare(b.properties.name))
       .map((f) => {
         const p = f.properties;
         const m = maintBySta.get(p.station);
         const pill = STATE_PILL[p.complianceState] || STATE_PILL.nodata;
-        const last = m && m.last_visit_date ? fmtDate(m.last_visit_date) : '—';
-        return `<tr><td>${MCO.escapeHTML(p.name)}</td>`
-             + `<td>${MCO.escapeHTML(p.station)}</td>`
-             + `<td>${MCO.escapeHTML(p.sub_network || '—')}</td>`
-             + `<td>${MCO.escapeHTML(pill.lbl)}</td>`
-             + `<td>${MCO.escapeHTML(last)}</td></tr>`;
-      });
-    tbody.innerHTML = rows.join('');
+        return {
+          name: p.name, station: p.station, net: p.sub_network,
+          status: pill.lbl,
+          last: m && m.last_visit_date ? fmtDate(m.last_visit_date) : null,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    srTwin.render(rows);
   }
 
   // ── Sub-network filter UI (chip toggles in navbar) ───────────────────────
@@ -844,13 +882,13 @@
     for (const net of allNetworks) {
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'chip';
+      chip.className = 'mco-chip';
       chip.dataset.network = net;
       chip.setAttribute('aria-pressed', activeNetworks.has(net) ? 'true' : 'false');
       const lbl = document.createElement('span');
       lbl.textContent = net;
       const count = document.createElement('span');
-      count.className = 'chip-count';
+      count.className = 'mco-chip-count';
       count.dataset.network = net;
       count.textContent = String(byNet[net] || 0);
       chip.appendChild(lbl);
@@ -864,7 +902,7 @@
         rebuildSource();   // re-emit source so colocation reflects visible networks
         applyAllFilters();
         renderLegend();    // counts depend on visible networks
-        pushState();
+        writeUrl();
       });
       subnetFiltersEl.appendChild(chip);
     }
@@ -898,120 +936,48 @@
       if (emptyStateEl) emptyStateEl.hidden = true;
       return;
     }
+    // [lead (bold), rest] — static strings, set as text.
     let msg = null;
     if (activeNetworks.size === 0) {
-      msg = '<strong>No networks selected.</strong> Click HydroMet or AgriMet to show stations.';
+      msg = ['No networks selected.', ' Click HydroMet or AgriMet to show stations.'];
     } else if (currentCats().size === 0) {
-      msg = '<strong>All legend categories hidden.</strong> Click a legend row to show stations.';
+      msg = ['All legend categories hidden.', ' Click a legend row to show stations.'];
     } else if (bucketMembers.size === 0) {
-      msg = 'No stations match the current filters.';
+      msg = ['', 'No stations match the current filters.'];
     }
     if (msg) {
-      emptyStateEl.innerHTML = `<div class="empty-state-card">${msg}</div>`;
+      const p = document.createElement('p');
+      p.style.margin = '0';
+      if (msg[0]) { const b = document.createElement('strong'); b.textContent = msg[0]; p.appendChild(b); }
+      p.append(msg[1]);
+      emptyStateEl.replaceChildren(p);
       emptyStateEl.hidden = false;
     } else {
       emptyStateEl.hidden = true;
     }
   }
 
-  // ── Search (custom listbox dropdown + flyTo + popup) ─────────────────────
-  // Custom rather than native <datalist> so the popup honors the app theme.
-  let _searchSorted = [];
-  let _activeSearchIndex = -1;
-  const SEARCH_MAX_RESULTS = 8;
-
-  function populateSearch() {
-    _searchSorted = [...stations].filter(s => stationById.has(s.station))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }
-
-  function matchScore(s, q) {
-    const n = (s.name || '').toLowerCase();
-    const id = (s.station || '').toLowerCase();
-    if (n === q || id === q)   return 0;
-    if (n.startsWith(q))       return 1;
-    if (id.startsWith(q))      return 2;
-    if (n.includes(q))         return 3;
-    if (id.includes(q))        return 4;
-    return Infinity;
-  }
-
-  function showSearchDropdown(rawQuery) {
-    const q = rawQuery.trim().toLowerCase();
-    if (!q) { hideSearchDropdown(); return; }
-    const matches = _searchSorted
-      .map(s => ({ s, score: matchScore(s, q) }))
-      .filter(m => m.score < Infinity)
-      .sort((a, b) => a.score - b.score || (a.s.name || '').localeCompare(b.s.name || ''))
-      .slice(0, SEARCH_MAX_RESULTS)
-      .map(m => m.s);
-    searchDropdown.innerHTML = '';
-    if (matches.length === 0) {
-      const li = document.createElement('li');
-      li.className = 'empty';
-      li.setAttribute('aria-disabled', 'true');
-      li.textContent = `No stations match "${rawQuery.trim()}"`;
-      searchDropdown.appendChild(li);
-      searchDropdown.hidden = false;
-      searchInput.setAttribute('aria-expanded', 'true');
-      _activeSearchIndex = -1;
-      return;
-    }
-    for (const s of matches) {
-      const li = document.createElement('li');
-      li.setAttribute('role', 'option');
-      li.dataset.stationId = s.station;
-      li.id = `search-opt-${s.station}`;
-      const name = document.createElement('span');
-      name.className = 'search-name';
-      name.textContent = s.name;
-      const meta = document.createElement('span');
-      meta.className = 'search-meta';
-      meta.textContent = `${s.station} · ${s.sub_network || '—'}`;
-      li.appendChild(name);
-      li.appendChild(meta);
-      // mousedown (not click) so the option commits before the input's blur.
-      li.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        selectStation(s.station);
-      });
-      searchDropdown.appendChild(li);
-    }
-    searchDropdown.hidden = false;
-    searchInput.setAttribute('aria-expanded', 'true');
-    _activeSearchIndex = -1;
-    searchInput.removeAttribute('aria-activedescendant');
-  }
-
-  function hideSearchDropdown() {
-    searchDropdown.hidden = true;
-    searchInput.setAttribute('aria-expanded', 'false');
-    _activeSearchIndex = -1;
-    searchInput.removeAttribute('aria-activedescendant');
-  }
-
-  function selectStation(stationId) {
-    hideSearchDropdown();
-    flyToAndOpen(stationId);
-    searchInput.value = '';
-    searchInput.blur();
-  }
-
-  function setActiveSearchItem(idx) {
-    const items = searchDropdown.querySelectorAll('li');
-    if (!items.length) return;
-    if (idx < 0)               idx = items.length - 1;
-    if (idx >= items.length)   idx = 0;
-    _activeSearchIndex = idx;
-    items.forEach((it, i) => it.classList.toggle('active', i === idx));
-    items[idx].scrollIntoView({ block: 'nearest' });
-    searchInput.setAttribute('aria-activedescendant', items[idx].id);
-  }
-
-  searchInput.addEventListener('input',  () => showSearchDropdown(searchInput.value));
-  searchInput.addEventListener('focus',  () => { if (searchInput.value) showSearchDropdown(searchInput.value); });
-  // Delay so a click/mousedown on an option can fire before we hide the list.
-  searchInput.addEventListener('blur',   () => setTimeout(hideSearchDropdown, 120));
+  // ── Search (kit combobox + flyTo + popup) ────────────────────────────────
+  // MCO.initSearchBox (kit 0.8.0) is the APG combobox this file used to
+  // hand-roll: role/aria wiring, ranking, arrow/Home/End/Enter/Esc, the
+  // "no matches" row as a disabled option, and a debounced count announcement.
+  const searchBox = MCO.initSearchBox({
+    input: searchInput,
+    listbox: searchList,
+    items: () => stations
+      .filter((s) => stationById.has(s.station))
+      .map((s) => ({ id: s.station, label: s.name || s.station, meta: `${s.station} · ${s.sub_network || '—'}` })),
+    value: () => _selectedStation,
+    label: 'Stations',
+    limit: 8,
+    onSelect: (id) => {
+      // Rail drawer or compact overlay: dismiss it; the popup takes over.
+      if (rail.isOpen()) rail.close({ restoreFocus: false });
+      else if (searchCtl.isOpen()) searchCtl.close({ restoreFocus: false });
+      else searchInput.blur();
+      flyToAndOpen(id);
+    },
+  });
 
   // Below 640px the field collapses into a disclosure button grouped with the
   // other nav buttons and reopens as a full-width overlay bar under the navbar.
@@ -1020,8 +986,29 @@
     wrap:    document.getElementById('search-wrap'),
     toggle:  document.getElementById('btn-search-toggle'),
     input:   searchInput,
-    onClose: hideSearchDropdown,
+    onClose: () => searchBox.close(),
   });
+  // The kit's combobox consumes Esc while it has something to close (the
+  // list, then the text). Once it passes Esc through, the compact overlay
+  // closes and hands focus back to its toggle.
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !e.defaultPrevented && searchCtl.isOpen()) {
+      e.preventDefault();
+      e.stopPropagation();
+      searchCtl.close();
+    }
+  });
+
+  // ── Landscape-phone rail (kit 0.10.0) ────────────────────────────────────
+  // MCO.initNavRail owns the drawer: focus in, the page inert, Esc / scrim /
+  // toggle to close, focus back to the toggle. The rail's search button is a
+  // hot control: it opens the drawer on the search field.
+  const rail = MCO.initNavRail({
+    toggle: document.getElementById('btn-rail-menu'),
+    drawer: document.getElementById('nav-drawer'),
+    scrim: document.getElementById('rail-scrim'),
+  });
+  document.getElementById('btn-rail-search').addEventListener('click', () => rail.open(searchInput));
 
   // With ?kbd=off the '/' shortcut is disabled, so advertising it would be a
   // lie. (The kit already hides this hint inside the compact overlay bar.)
@@ -1037,7 +1024,7 @@
       // Re-enable its sub-network so the user can see the dot
       activeNetworks.add(s.sub_network);
       MCO.lsSet('mco-maint-networks', JSON.stringify([...activeNetworks]));
-      for (const chip of subnetFiltersEl.querySelectorAll('.chip')) {
+      for (const chip of subnetFiltersEl.querySelectorAll('.mco-chip')) {
         if (chip.dataset.network === s.sub_network) chip.setAttribute('aria-pressed', 'true');
       }
       rebuildSource();
@@ -1054,15 +1041,12 @@
 
   // ── Popup ────────────────────────────────────────────────────────────────
   // ── Photo lightbox (visit photos) ───────────────────────────────────────
-  const _galleries = new Map();   // gallery id → [{thumb, full, filename}]
-  let _galleryCounter = 0;
   // Photo URLs come from the API response (AirTable attachments), so they are
-  // untrusted input to an HTML attribute AND a CSS url(). https only — anything
-  // else (javascript:, data:, a relative path, garbage) is dropped — and the
-  // characters that could end the CSS string or the url() token are
-  // percent-encoded, which is the same URL to the server. The result then goes
-  // through escapeHTML like every other value in this template. Before this, a
-  // `'` or `"` in p.thumb could break out of style="" and inject attributes.
+  // untrusted. https only — anything else (javascript:, data:, a relative
+  // path, garbage) is dropped — and the characters that could end the CSS
+  // string or the url() token are percent-encoded, which is the same URL to
+  // the server. They reach the DOM only through style properties and .src,
+  // never markup (the popup used to interpolate p.thumb into style="").
   function safePhotoUrl(u) {
     // MCO.map.safeUrl (kit 0.8.0+): parsed, https: only, else null. Relative
     // values resolve against this page, so require an absolute URL first.
@@ -1070,19 +1054,30 @@
     if (!href) return null;
     return href.replace(/['"()\\\s]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
   }
-  function photosHTML(arr) {
-    if (!Array.isArray(arr)) return '';
+  // Tiny DOM builder for the popup: text only ever goes in as textContent.
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function photosEl(arr) {
+    if (!Array.isArray(arr)) return null;
     const photos = arr
       .map((p) => p && { thumb: safePhotoUrl(p.thumb), full: safePhotoUrl(p.full), filename: p.filename })
       .filter((p) => p && p.thumb && p.full);
-    if (!photos.length) return '';
-    const gid = 'g' + (_galleryCounter++);
-    _galleries.set(gid, photos);
-    return `<div class="visit-photos">${photos.map((p, i) =>
-      `<button type="button" class="visit-photo-thumb" data-gid="${gid}" data-idx="${i}" ` +
-      `style="background-image:url('${MCO.escapeHTML(p.thumb)}')" ` +
-      `aria-label="View photo ${i + 1} of ${photos.length}"${p.filename ? ` title="${MCO.escapeHTML(p.filename)}"` : ''}></button>`
-    ).join('')}</div>`;
+    if (!photos.length) return null;
+    const wrap = el('div', 'visit-photos');
+    photos.forEach((p, i) => {
+      const b = el('button', 'visit-photo-thumb');
+      b.type = 'button';
+      b.style.backgroundImage = `url("${p.thumb}")`;
+      b.setAttribute('aria-label', `View photo ${i + 1} of ${photos.length}`);
+      if (p.filename) b.title = String(p.filename);
+      b.addEventListener('click', () => openLightbox(photos, i));
+      wrap.appendChild(b);
+    });
+    return wrap;
   }
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightbox-img');
@@ -1127,14 +1122,6 @@
     if (e.key === 'ArrowLeft') { e.preventDefault(); stepLightbox(-1); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
   });
-  // Delegated: a thumbnail anywhere (incl. inside a popup) opens its gallery.
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest && e.target.closest('.visit-photo-thumb');
-    if (!btn) return;
-    const photos = _galleries.get(btn.dataset.gid);
-    if (photos) openLightbox(photos, +btn.dataset.idx);
-  });
-
   const STATE_PILL = {
     visited:   { cls: 'visited',   lbl: 'Visited this year' },
     overdue:   { cls: 'overdue',   lbl: 'Overdue' },
@@ -1145,90 +1132,184 @@
   // Trip-type chip colors are pulled from the trip-type legend so they always match.
   const TRIP_COLORS = Object.fromEntries(MODES.triptype.cats.map(c => [c.key, c.color]));
   function tripChips(arr) {
-    if (!arr || !arr.length) return '';
-    return arr.map(t => {
+    const frag = document.createDocumentFragment();
+    for (const t of (Array.isArray(arr) ? arr : [])) {
       const c = TRIP_COLORS[t] || TRIP_COLORS['Other'];
       // The category color marks the border and a light tint; the TEXT stays
       // --text-primary (CSS). Colored text failed 1.4.3 — Maintenance teal on
-      // the dark popup surface measured under 4.5:1.
-      return `<span class="trip-chip" style="border-color:${c};background:${c}22">${MCO.escapeHTML(t)}</span>`;
-    }).join(' ');
+      // the dark popup surface measured under 4.5:1. c is one of MODES' hexes.
+      const chip = el('span', 'trip-chip', t);
+      chip.style.borderColor = c;
+      chip.style.background = c + '22';
+      frag.append(chip, ' ');
+    }
+    return frag;
   }
-  function visitHTML(v) {
-    const who = v.inspected_by ? `<div class="visit-who"><span class="lbl">By</span> ${MCO.escapeHTML(v.inspected_by)}</div>` : '';
-    const note = (v.comments || v.description) ? `<div class="visit-note">${MCO.escapeHTML(v.comments || v.description)}</div>` : '';
+  function visitEl(v) {
+    const item = el('div', 'visit-item');
+    const head = el('div', 'visit-head');
+    head.appendChild(el('span', 'visit-date', fmtDate(v.date)));
+    if (v.date) head.appendChild(el('span', 'visit-rel', `· ${relDays(v.date)}`));
+    head.appendChild(tripChips(v.trip_type));
+    item.appendChild(head);
+    if (v.inspected_by) {
+      const who = el('div', 'visit-who');
+      who.append(el('span', 'lbl', 'By'), ' ' + v.inspected_by);
+      item.appendChild(who);
+    }
+    if (v.comments || v.description) item.appendChild(el('div', 'visit-note', v.comments || v.description));
     const sensors = [];
-    if (v.sensors_added && v.sensors_added.length) sensors.push('+ ' + v.sensors_added.map(MCO.escapeHTML).join(', '));
-    if (v.sensors_removed && v.sensors_removed.length) sensors.push('− ' + v.sensors_removed.map(MCO.escapeHTML).join(', '));
-    const sens = sensors.length ? `<div class="visit-sensors">${sensors.join(' · ')}</div>` : '';
-    const tasks = (v.tasks && v.tasks.length)
-      ? `<details class="visit-tasks"><summary>${v.tasks.length} task${v.tasks.length === 1 ? '' : 's'} completed</summary><ul>${v.tasks.map(t => `<li>${MCO.escapeHTML(t)}</li>`).join('')}</ul></details>`
-      : '';
-    const rel = v.date ? ` <span style="color:var(--text-muted)">· ${MCO.escapeHTML(relDays(v.date))}</span>` : '';
-    return `<div class="visit-item"><div class="visit-head"><span class="visit-date">${MCO.escapeHTML(fmtDate(v.date))}</span>${rel} ${tripChips(v.trip_type)}</div>${who}${note}${sens}${tasks}${photosHTML(v.photos)}</div>`;
+    if (v.sensors_added && v.sensors_added.length) sensors.push('+ ' + v.sensors_added.join(', '));
+    if (v.sensors_removed && v.sensors_removed.length) sensors.push('− ' + v.sensors_removed.join(', '));
+    if (sensors.length) item.appendChild(el('div', 'visit-sensors', sensors.join(' · ')));
+    if (v.tasks && v.tasks.length) {
+      const d = el('details', 'visit-tasks');
+      d.appendChild(el('summary', null, `${v.tasks.length} task${v.tasks.length === 1 ? '' : 's'} completed`));
+      const ul = el('ul');
+      for (const t of v.tasks) ul.appendChild(el('li', null, t));
+      d.appendChild(ul);
+      item.appendChild(d);
+    }
+    const ph = photosEl(v.photos);
+    if (ph) item.appendChild(ph);
+    return item;
   }
-  function popupHTML(stationId) {
+  // Label/value pairs as the kit's .mco-facts <dl> (0.9.0), the same markup
+  // MCO.map.popupContent emits, so the popup and the sheet read alike.
+  function factsEl(pairs) {
+    const dl = el('dl', 'mco-facts');
+    for (const [k, v] of pairs) {
+      const row = el('div');
+      row.append(el('dt', null, k), el('dd', null, v));
+      dl.appendChild(row);
+    }
+    return dl;
+  }
+  const withRel = (iso) => `${fmtDate(iso)} (${relDays(iso)})`;
+  function stationBodyEl(stationId) {
     const s = stationById.get(stationId);
-    if (!s) return '';
     const m = maintBySta.get(stationId) || null;
     const state = complianceStateFor(s);
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
+    const body = document.createDocumentFragment();
 
-    let summary;
+    // [data-peek]: what the bottom sheet's peek detent shows (pill + facts).
+    const peek = el('div');
+    peek.dataset.peek = '';
+    body.appendChild(peek);
+    const pillRow = el('div');
+    pillRow.appendChild(el('span', `pop-pill ${pill.cls}`, pill.lbl));
+    peek.appendChild(pillRow);
+
+    // Facts where there are values; a prose note where the state needs one.
+    const facts = [];
+    let note = null;
     if (dataUnavailable) {
-      summary = `<div class="pop-summary">Maintenance data is currently unavailable.</div>`;
+      note = 'Maintenance data is currently unavailable.';
     } else if (state === 'new') {
-      summary = `<div class="pop-summary">Installed this year — not yet due for its annual <strong>Maintenance</strong> visit.</div>`;
+      note = 'Installed this year — not yet due for its annual Maintenance visit.';
     } else if (state === 'as_needed') {
-      const base = (m && m.last_qualifying_visit_date)
-        ? `Last Maintenance: <strong>${MCO.escapeHTML(fmtDate(m.last_qualifying_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_qualifying_visit_date))})<br>`
-        : (m && m.last_visit_date)
-          ? `Last visit of any type: <strong>${MCO.escapeHTML(fmtDate(m.last_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_visit_date))})<br>`
-          : '';
-      summary = `<div class="pop-summary">${base}AgriMet station — visited as needed, not subject to the annual Maintenance requirement.</div>`;
+      if (m && m.last_qualifying_visit_date) facts.push(['Last Maintenance', withRel(m.last_qualifying_visit_date)]);
+      else if (m && m.last_visit_date) facts.push(['Last visit (any type)', withRel(m.last_visit_date)]);
+      note = 'AgriMet station — visited as needed, not subject to the annual Maintenance requirement.';
     } else if (m && m.last_qualifying_visit_date) {
-      summary = `<div class="pop-summary">Last Maintenance: <strong>${MCO.escapeHTML(fmtDate(m.last_qualifying_visit_date))}</strong> (${MCO.escapeHTML(relDays(m.last_qualifying_visit_date))})<br>` +
-                `<strong>${MCO.escapeHTML(String(m.qualifying_visits_this_year))}</strong> Maintenance visit${m.qualifying_visits_this_year === 1 ? '' : 's'} this year</div>`;
+      const n = m.qualifying_visits_this_year;
+      facts.push(['Last Maintenance', withRel(m.last_qualifying_visit_date)]);
+      facts.push(['This year', `${n} Maintenance visit${n === 1 ? '' : 's'}`]);
     } else {
-      summary = `<div class="pop-summary">No <strong>Maintenance</strong> visit on record${m && m.last_visit_date ? ` (last visit of any type ${MCO.escapeHTML(fmtDate(m.last_visit_date))})` : ''}.</div>`;
+      note = 'No Maintenance visit on record.';
+      if (m && m.last_visit_date) facts.push(['Last visit (any type)', fmtDate(m.last_visit_date)]);
     }
+    if (facts.length) peek.appendChild(factsEl(facts));
+    if (note) peek.appendChild(el('p', 'pop-summary', note));
 
-    const visits = (m && m.visits && m.visits.length)
-      ? `<div class="pop-section-title">Visits</div><div class="pop-scroll">${m.visits.map(visitHTML).join('')}</div>`
-      : '';
-    const noRecords = (!m && !dataUnavailable) ? `<div class="pop-empty">No maintenance records for this station.</div>` : '';
+    if (m && m.visits && m.visits.length) {
+      body.appendChild(el('div', 'pop-section-title', 'Visits'));
+      const scroll = el('div', 'pop-scroll');
+      for (const v of m.visits) scroll.appendChild(visitEl(v));
+      body.appendChild(scroll);
+    }
+    if (!m && !dataUnavailable) body.appendChild(el('div', 'pop-empty', 'No maintenance records for this station.'));
+    return body;
+  }
+  // The station detail as DOM: the kit's popup shell (title, mono subtitle,
+  // dashboard action through safeUrl) with this map's visit history inside.
+  // No API string ever reaches setHTML/innerHTML (HOUSE-STYLE §7).
+  // withTitle false: the sheet carries the name in its own <h2>.
+  function stationContent(stationId, withTitle = true) {
+    const s = stationById.get(stationId);
+    const frag = MCO.map.popupContent({
+      title: withTitle ? (s.name || stationId) : null,
+      subtitle: `${stationId}${s.sub_network ? ` · ${s.sub_network}` : ''}`,
+      actions: [{ label: 'Open dashboard →', href: DASH_URL(stationId) }],
+    });
+    const root = frag.querySelector('.mco-popup');
+    root.insertBefore(stationBodyEl(stationId), root.querySelector('.mco-popup-actions'));
+    return frag;
+  }
 
-    return `
-      <div class="pop-title">${MCO.escapeHTML(s.name || stationId)}</div>
-      <div class="pop-sub">${MCO.escapeHTML(stationId)}${s.sub_network ? ` · ${MCO.escapeHTML(s.sub_network)}` : ''}</div>
-      <div><span class="pop-pill ${pill.cls}">${pill.lbl}</span></div>
-      ${summary}
-      ${visits}
-      ${noRecords}
-      <div class="pop-links"><a href="${DASH_URL(stationId)}" target="_blank" rel="noopener">Open dashboard →</a></div>
-    `;
+  // ── Compact: the bottom sheet instead of the anchored popup ──────────────
+  // On a phone an anchored 340px popup covers most of the map and the visit
+  // history scrolls inside it. MCO.initSheet (kit 0.9.0) gives peek (pill +
+  // summary) and full detents, drag and its keyboard twin, focus to the
+  // title and back to the opener, and modality only in the full detent. The
+  // two dialogs stay live: a thumb in the sheet opens the lightbox.
+  const sheetEl = document.getElementById('station-sheet');
+  const sheetTitleEl = document.getElementById('station-sheet-title');
+  const sheetBodyEl = sheetEl.querySelector('.mco-sheet-body');
+  let _sheetOpen = false;
+  let _suppressSheetClose = false;
+  const stationSheet = MCO.initSheet({
+    sheet: sheetEl,
+    peekHeight: 'auto',
+    // A function (kit 0.11.3): resolved each time the full detent goes
+    // modal, so whatever sits beside the sheet then is covered. The two
+    // dialogs stay live: a thumb in the sheet opens the lightbox over it.
+    inertRoots: () => MCO.overlay.siblingsOf(sheetEl, [infoModal, document.getElementById('lightbox')]),
+    fallbackFocus: document.getElementById('map'),
+    onState: (st) => {
+      if (st !== 'closed') { _sheetOpen = true; return; }
+      _sheetOpen = false;
+      if (_suppressSheetClose) { _suppressSheetClose = false; return; }
+      if (_selectedStation) deselected();
+    },
+  });
+  function openSheetFor(stationId) {
+    const s = stationById.get(stationId);
+    sheetTitleEl.textContent = s.name || stationId;
+    sheetBodyEl.replaceChildren(stationContent(stationId, false));
+    stationSheet.open('peek');
   }
 
   function openPopupFor(stationId, lngLat) {
     const s = stationById.get(stationId);
     if (!s) return;
     if (_popup) { _suppressNextPopupClose = true; _popup.remove(); _popup = null; }
+    // Drill-down gets ONE history entry: push on the first step from "no
+    // station open", replace while one stays open (HOUSE-STYLE §4).
+    const push = !_selectedStation && !_fromHistory;
     _selectedStation = stationId;
+    if (MCO.viewport.isCompact()) {
+      openSheetFor(stationId);
+      announcePopup(stationId);
+      writeUrl({ push });
+      return;
+    }
+    if (_sheetOpen) { _suppressSheetClose = true; stationSheet.close({ restoreFocus: false }); }
     const p = new maplibregl.Popup({ closeOnClick: false, maxWidth: '340px', offset: 12 })
       .setLngLat(lngLat || [s.longitude, s.latitude])
-      .setHTML(popupHTML(stationId))
+      .setDOMContent(stationContent(stationId))
       .addTo(map);
     p.on('close', () => {
       if (_suppressNextPopupClose) { _suppressNextPopupClose = false; return; }
       if (_popup === p) {
         _popup = null;
-        _selectedStation = null;
-        pushState();
+        deselected();
       }
     });
     _popup = p;
     announcePopup(stationId);
-    pushState();
+    writeUrl({ push });
   }
 
   // ── Spider expand ────────────────────────────────────────────────────────
@@ -1300,8 +1381,20 @@
   function wireMapLoad() {
     zoomFloor = MCO.map.installZoomFloor(map);
 
-    map.on('load', () => {
+    // EVERY style.load, not once: the first style, each theme switch, and the
+    // blank fallback watchBasemap swaps in when CARTO fails all wipe our
+    // sources and layers. addCustomLayers is idempotent; rebuildSource
+    // refills the stations source from memory (a no-op before data lands).
+    map.on('style.load', () => {
       addCustomLayers();
+      rebuildSource();
+    });
+    // A basemap style that fails (or never answers) retries once, then falls
+    // back to a blank --bg-deep style with a notice, so the stations still
+    // draw instead of a white page.
+    MCO.map.watchBasemap(map);
+
+    map.on('load', () => {
       zoomFloor.refresh();
       _mapReady = true;
       // Kick off data fetch once layers exist, so rebuildSource never lands before its source.
@@ -1309,7 +1402,7 @@
     });
 
     // Reflect every pan/zoom in the URL so the view is sharable
-    map.on('moveend', pushState);
+    map.on('moveend', writeUrl);
 
     // Keep spider feet anchored at constant pixel offset while the camera moves.
     // Coalesce multiple per-frame `move` events into a single rebuild via rAF.
@@ -1319,33 +1412,14 @@
     });
   }
 
-  // ── URL state push ───────────────────────────────────────────────────────
+  // ── URL state ────────────────────────────────────────────────────────────
   // Lists are space-joined; URLSearchParams encodes spaces as '+', giving
   // tidy URLs like net=hydromet+agrimet. Enum-string values are lowercase.
   // Every parameter has a default and none is written while it matches, so a
   // fresh load carries no query string at all (HOUSE-STYLE §4).
-  function osTheme() {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
-  // Is the camera where a fresh load would have put it? cameraForBounds gives
-  // the same answer fitBounds acts on, so this stays correct as the container
-  // resizes rather than comparing against a stored constant.
-  function atDefaultExtent() {
-    if (!_mapReady) return true;
-    let want;
-    try { want = map.cameraForBounds(MT_FIT_BOUNDS, FIT_OPTS); } catch { return false; }
-    if (!want) return false;
-    const wc = want.center;
-    const wlng = typeof wc.lng === 'number' ? wc.lng : wc[0];
-    const wlat = typeof wc.lat === 'number' ? wc.lat : wc[1];
-    const c = map.getCenter();
-    return Math.abs(map.getZoom() - want.zoom) < 0.02
-        && Math.abs(c.lng - wlng) < 0.01
-        && Math.abs(c.lat - wlat) < 0.01;
-  }
-
-  function pushState() {
+  // Mirror the view into the query string (history.replaceState via the kit).
+  // Was named pushState(), which it never did: it replaces. (MIGRATING 0.8.0)
+  function writeUrl(opts) {
     const params = {};
     if (activeMode !== 'compliance') params.mode = activeMode;
     // Default is every known sub-network, so only a narrowed selection is
@@ -1368,26 +1442,51 @@
     // either way — the parameter exists so a shared link can carry a
     // deliberate one, not so every link imposes the sender's theme.
     const theme = MCO.getTheme();
-    if (theme && theme !== osTheme()) params.theme = theme;
+    if (theme && theme !== MCO.osTheme()) params.theme = theme;
     // The camera's default is the fitted Montana extent. Emitted as a set,
     // because the parser needs all three to position the map.
-    if (!atDefaultExtent()) Object.assign(params, MCO.map.cameraParams(map));
+    // cameraParamsIfDefault (kit 0.8.0) is {} while the camera sits where a
+    // fresh load fits Montana, so a default view writes no lng/lat/zoom.
+    if (_mapReady) Object.assign(params, MCO.map.cameraParamsIfDefault(map));
     if (_selectedStation) params.station = _selectedStation;
-    MCO.replaceUrlState(params);
+    if (opts && opts.push) MCO.pushUrlState(params, { state: { mcoDetail: _selectedStation } });
+    else MCO.replaceUrlState(params);
   }
 
   // Track whether the next Popup `close` event was triggered programmatically
-  // (so we don't pushState for an open-replace; the new popup pushes its own state).
+  // (so we don't writeUrl for an open-replace; the new popup pushes its own state).
   let _suppressNextPopupClose = false;
+  // The station closed. If its entry was one we pushed, step Back over it
+  // rather than leave a dead "station open" entry in the history; popstate
+  // then re-syncs the URL to the current view. Otherwise just replace.
+  let _fromHistory = false;
+  function deselected() {
+    _selectedStation = null;
+    if (!_fromHistory && history.state && history.state.mcoDetail) history.back();
+    else writeUrl();
+  }
+  // Back/Forward (MCO.onUrlState): open or close the station to match.
+  MCO.onUrlState((params) => {
+    const id = (params.get('station') || '').toLowerCase() || null;
+    _fromHistory = true;
+    try {
+      if (id && id !== _selectedStation && stationById.has(id)) {
+        closeSpider();
+        openPopupFor(id);
+      } else if (!id && _selectedStation) {
+        closePopup();
+      }
+    } finally { _fromHistory = false; }
+    writeUrl();   // sync the camera etc. into the restored entry
+  });
+
   function closePopup() {
+    if (_sheetOpen) { stationSheet.close(); return; }   // onState clears the selection
     if (!_popup) return;
     _suppressNextPopupClose = true;
     _popup.remove();
     _popup = null;
-    if (_selectedStation) {
-      _selectedStation = null;
-      pushState();
-    }
+    if (_selectedStation) deselected();
   }
 
   // ── Spider close grace period (so cursor can travel from anchor to a foot) ─
@@ -1442,48 +1541,42 @@
   }
 
   // ── Hover tooltip + hover-open spider for co-located sites ────────────────
-  const tooltipEl = document.getElementById('tooltip');
-  function showTooltip(stationId, e) {
-    const s = stationById.get(stationId);
-    if (!s) return;
-    const m = maintBySta.get(stationId) || null;
-    const state = complianceStateFor(s);
-    const pill = STATE_PILL[state] || STATE_PILL.overdue;
-    let relLine = '';
-    if (!dataUnavailable && m && m.last_qualifying_visit_date) {
-      relLine = `<span class="tooltip-rel">last Maint./Repair ${MCO.escapeHTML(relDays(m.last_qualifying_visit_date))}</span>`;
-    }
-    tooltipEl.innerHTML =
-      `<span class="tooltip-name">${MCO.escapeHTML(s.name || stationId)}</span>` +
-      `<span class="tooltip-sub">${MCO.escapeHTML(s.station)}</span>` +
-      `<span class="tooltip-line">${MCO.escapeHTML(pill.lbl)}</span>` +
-      relLine;
-    tooltipEl.classList.add('visible');
-    tooltipEl.style.left = `${e.originalEvent.clientX + 14}px`;
-    tooltipEl.style.top  = `${e.originalEvent.clientY + 14}px`;
-  }
-  function hideTooltip() { tooltipEl.classList.remove('visible'); }
-
-  // Single global mousemove dispatcher — does its own queryRenderedFeatures
-  // against the layer set. Avoids layer-scoped listeners which can become
-  // detached when the style is swapped on theme toggle (MapLibre keeps the
-  // map-level handler stable across setStyle).
+  // The tooltip is MCO.map.initCursorTooltip (kit 0.8.0): the dispatcher,
+  // edge-flipped positioning, cursor: pointer and mouseout cleanup, all set
+  // with textContent. Spider hover stays ours, in its own listener below.
   const HOVER_LAYERS = [
-    'stations-layer', 'stations-badge', 'stations-id-label',
     'spider-layer', 'spider-id-label',
+    'stations-layer', 'stations-badge', 'stations-id-label',
   ];
   const ANCHOR_LAYER_IDS = new Set(['stations-layer', 'stations-badge', 'stations-id-label']);
   let _hoveredStation = null;
 
+  function tooltipFor(f) {
+    const stationId = f.properties.station;
+    const s = stationById.get(stationId);
+    if (!s) return null;
+    const m = maintBySta.get(stationId) || null;
+    const pill = STATE_PILL[complianceStateFor(s)] || STATE_PILL.overdue;
+    const line = [pill.lbl];
+    if (!dataUnavailable && m && m.last_qualifying_visit_date) {
+      line.push(`last Maint./Repair ${relDays(m.last_qualifying_visit_date)}`);
+    }
+    return { name: s.name || stationId, sub: s.station, line };
+  }
+
   function wireMapHover() {
+    MCO.map.initCursorTooltip(map, {
+      element: document.getElementById('tooltip'),
+      layers: HOVER_LAYERS,
+      render: tooltipFor,
+    });
+    // Hover-open the spider on a stacked anchor; close it (after a grace
+    // period, so the cursor can travel to a foot) when the pointer leaves.
     map.on('mousemove', (e) => {
       const layers = HOVER_LAYERS.filter(lid => map.getLayer(lid));
-      const feats = layers.length ? map.queryRenderedFeatures(e.point, { layers }) : [];
-      const f = feats[0] || null;
+      const f = (layers.length ? map.queryRenderedFeatures(e.point, { layers }) : [])[0] || null;
       if (f) {
-        map.getCanvas().style.cursor = 'pointer';
         cancelSpiderClose();
-        showTooltip(f.properties.station, e);
         _hoveredStation = f.properties.station;
         if (ANCHOR_LAYER_IDS.has(f.layer.id)
             && f.properties.colocationCount > 1
@@ -1491,16 +1584,11 @@
           openSpider(f.properties.bucket, f.geometry.coordinates.slice());
         }
       } else if (_hoveredStation !== null) {
-        map.getCanvas().style.cursor = '';
-        hideTooltip();
         scheduleSpiderClose();
         _hoveredStation = null;
       }
     });
-    // Cursor + tooltip cleanup when the pointer leaves the map entirely.
     map.getCanvas().addEventListener('mouseleave', () => {
-      map.getCanvas().style.cursor = '';
-      hideTooltip();
       scheduleSpiderClose();
       _hoveredStation = null;
     });
@@ -1509,6 +1597,9 @@
   // Global keyboard shortcuts: ESC closes things; / focuses search.
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      // An open dialog (lightbox, info) owns this Esc; the sheet's own Esc is
+      // handled by the kit's overlay stack.
+      if (document.querySelector('dialog[open]') || e.defaultPrevented) return;
       closeSpider();
       closePopup();
       return;
@@ -1519,65 +1610,43 @@
         t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
       if (inField) return;
       e.preventDefault();
-      // When the field is collapsed the overlay has to open first — otherwise
-      // '/' focuses an input that is display:none and the keystroke is lost.
+      // In rail mode the field lives in the closed drawer, and when it is
+      // collapsed the overlay has to open first: otherwise '/' focuses an
+      // input that is display:none and the keystroke is lost.
+      if (rail.isRail()) { rail.open(searchInput); return; }
       if (searchCtl.isCollapsed()) { searchCtl.open(); return; }
       searchInput.focus();
       searchInput.select();
     }
   });
-  // Keyboard nav inside the custom dropdown.
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      searchInput.value = '';
-      hideSearchDropdown();
-      // In the collapsed overlay, Escape should dismiss the bar and hand focus
-      // back to the toggle — blurring alone would strand focus on the body
-      // behind a still-open overlay.
-      if (searchCtl.isOpen()) { searchCtl.close(); return; }
-      searchInput.blur();
-      return;
-    }
-    if (searchDropdown.hidden) return;
-    const items = searchDropdown.querySelectorAll('li');
-    if (!items.length) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveSearchItem(_activeSearchIndex + 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveSearchItem(_activeSearchIndex - 1);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const idx = _activeSearchIndex >= 0 ? _activeSearchIndex : 0;
-      selectStation(items[idx].dataset.stationId);
-    }
-  });
-
   // ── Mode toggle ──────────────────────────────────────────────────────────
-  for (const btn of document.querySelectorAll('.seg-btn[data-mode]')) {
-    btn.setAttribute('aria-pressed', btn.dataset.mode === activeMode ? 'true' : 'false');
-    btn.addEventListener('click', () => {
-      if (btn.dataset.mode === activeMode) return;
-      activeMode = btn.dataset.mode;
-      MCO.lsSet('mco-maint-mode', activeMode);
-      for (const b of document.querySelectorAll('.seg-btn[data-mode]')) {
-        b.setAttribute('aria-pressed', b.dataset.mode === activeMode ? 'true' : 'false');
-      }
-      refreshDotColors();
-      applyAllFilters();  // category filter belongs to the active mode
-      pushState();
-    });
+  // Segmented buttons above 1060px, a <select> at and below it
+  // (MCO.initSegmentedFallback, kit 0.9.0): one value, each mirrors the
+  // other, and focus follows across a breakpoint flip.
+  function setMode(mode) {
+    if (!MODES[mode] || mode === activeMode) return;
+    activeMode = mode;
+    MCO.lsSet('mco-maint-mode', activeMode);
+    refreshDotColors();
+    applyAllFilters();  // category filter belongs to the active mode
+    writeUrl();
   }
+  const modeCtl = MCO.initSegmentedFallback({
+    group: document.getElementById('mode-seg'),
+    select: document.getElementById('mode-select'),
+    onChange: setMode,
+  });
+  modeCtl.set(activeMode);
 
   // ── Refresh (manual data reload) ─────────────────────────────────────────
-  document.getElementById('btn-refresh').addEventListener('click', () => {
-    // Don't refly to the deep-linked station on a manual refresh.
-    if (_initStationConsumed) { /* deep link already handled */ }
+  // (A manual refresh doesn't refly to the deep-linked station: loadAll
+  // consumes ?station= only on the first load.)
+  function refreshData() {
     if (!_mapReady) return;   // the map's load handler runs the first fetch
     refreshStampEl.textContent = 'loading…';
     loadAll();
-  });
+  }
+  document.getElementById('btn-refresh').addEventListener('click', refreshData);
 
   // ── Labels toggle ────────────────────────────────────────────────────────
   let labelsOn = (() => {
@@ -1599,7 +1668,7 @@
     labelsBtn.setAttribute('aria-pressed', labelsOn ? 'true' : 'false');
     MCO.lsSet('mco-maint-labels', labelsOn ? 'on' : 'off');
     applyLabelsVisibility();
-    pushState();
+    writeUrl();
   });
 
   // ── Legend collapse/expand ───────────────────────────────────────────────
@@ -1620,7 +1689,7 @@
   })();
 
   // apply() runs once at init and calls onChange with it. Don't let that first
-  // call reach pushState: it would rewrite the URL before the deep-link handler
+  // call reach writeUrl: it would rewrite the URL before the deep-link handler
   // has set _selectedStation, stripping ?station= off the link that opened it.
   let _legendInit = true;
   MCO.initCollapsible({
@@ -1631,15 +1700,17 @@
     onChange: (collapsed) => {
       legendCollapsed = collapsed;
       legendToggleBtn.setAttribute('aria-label', collapsed ? 'Expand legend' : 'Collapse legend');
-      if (!_legendInit) pushState();
+      if (!_legendInit) writeUrl();
     },
   });
   _legendInit = false;
 
   // ── Legend (Plotly-style toggles) ────────────────────────────────────────
-  // Single click toggles a category; double-click isolates that category
-  // (double-click an already-isolated category to show all again).
-  const LEGEND_DBLCLICK_MS = 280;
+  // MCO.initLegendToggles (kit 0.8.0) owns the interaction: click toggles a
+  // category, double-click (or Shift+Enter) isolates it, aria-pressed drives
+  // the styling, and each change is announced once. The kit dims the SWATCH
+  // of an off row, never the row: the old `.legend-row.off { opacity: .4 }`
+  // took the label to ~2.7:1 (WCAG 1.4.3).
 
   // Count stations per category of the active mode, respecting the visible
   // sub-network set (so the legend counts match what's on the map).
@@ -1655,100 +1726,56 @@
     return counts;
   }
 
+  // Rows are rebuilt whenever counts or the mode change, so the toggles
+  // controller is rebuilt with them.
+  let _legendCtl = null;
   function renderLegend() {
+    if (_legendCtl) { _legendCtl.dispose(); _legendCtl = null; }
     legendRowsEl.innerHTML = '';
     const m = MODES[activeMode];
     legendTitleEl.textContent = m.legendTitle;
-    const set = currentCats();
     const counts = categoryCounts();
+    const rows = [];
     for (const r of m.cats) {
       if (r.hidden) continue;   // e.g. compliance "No data" — only set on a total fetch failure
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'legend-row';
-      row.dataset.catKey = r.key;
-      const on = set.has(r.key);
-      row.setAttribute('aria-pressed', on ? 'true' : 'false');
-      if (!on) row.classList.add('off');
+      row.className = 'mco-legend-row';
+      row.dataset.key = r.key;
       const sw = document.createElement('span');
-      sw.className = 'legend-swatch';
-      sw.style.background = r.color;
+      sw.className = 'mco-legend-swatch';
+      sw.dataset.shape = 'circle';   // the map mark is a dot
+      sw.style.setProperty('--swatch', r.color);
       sw.setAttribute('aria-hidden', 'true');
       const lb = document.createElement('span');
-      lb.className = 'legend-lbl';
+      lb.className = 'mco-legend-label';
       lb.textContent = r.label;
       const ct = document.createElement('span');
-      ct.className = 'legend-count';
+      ct.className = 'mco-legend-count';
       ct.textContent = String(counts[r.key] || 0);
-      row.appendChild(sw);
-      row.appendChild(lb);
-      row.appendChild(ct);
-      attachLegendHandlers(row, r.key);
+      row.append(sw, lb, ct);
       legendRowsEl.appendChild(row);
+      rows.push(row);
     }
     const hint = document.createElement('div');
     hint.className = 'legend-hint';
     hint.textContent = 'Click to toggle · Double-click to isolate';
     legendRowsEl.appendChild(hint);
-  }
 
-  function refreshLegendVisuals() {
-    const set = currentCats();
-    for (const row of legendRowsEl.querySelectorAll('.legend-row')) {
-      const on = set.has(row.dataset.catKey);
-      row.setAttribute('aria-pressed', on ? 'true' : 'false');
-      row.classList.toggle('off', !on);
-    }
-  }
-
-  function attachLegendHandlers(row, key) {
-    let clickTimer = null;
-    row.addEventListener('click', () => {
-      // Defer single-click action so a follow-up dblclick can pre-empt it.
-      if (clickTimer) return;                  // already pending → second click; let dblclick handle it
-      clickTimer = setTimeout(() => {
-        clickTimer = null;
-        toggleCategory(key);
-      }, LEGEND_DBLCLICK_MS);
+    const rowKeys = new Set(rows.map((r) => r.dataset.key));
+    _legendCtl = MCO.initLegendToggles({
+      rows,
+      visible: [...currentCats()].filter((k) => rowKeys.has(k)),
+      noun: 'categories',
+      onChange: (vis) => {
+        // Categories with no legend row (compliance "nodata") keep their
+        // state: the controller only knows the rows it was given.
+        const set = currentCats();
+        for (const k of rowKeys) { if (vis.has(k)) set.add(k); else set.delete(k); }
+        applyAllFilters();
+        writeUrl();
+      },
     });
-    row.addEventListener('dblclick', () => {
-      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-      isolateCategory(key);
-    });
-    // Keyboard equivalent for double-click: Shift+Enter on a focused row isolates.
-    // (Plain Enter / Space still fires `click` natively → toggle.)
-    row.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.shiftKey) {
-        e.preventDefault();
-        if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-        isolateCategory(key);
-      }
-    });
-  }
-
-  function toggleCategory(key) {
-    const set = currentCats();
-    if (set.has(key)) set.delete(key);
-    else set.add(key);
-    refreshLegendVisuals();
-    applyAllFilters();
-    pushState();
-  }
-
-  function isolateCategory(key) {
-    const set = currentCats();
-    const all = currentAllCats();
-    // Already isolated to this key → restore everything.
-    if (set.size === 1 && set.has(key)) {
-      set.clear();
-      for (const k of all) set.add(k);
-    } else {
-      set.clear();
-      set.add(key);
-    }
-    refreshLegendVisuals();
-    applyAllFilters();
-    pushState();
   }
 
   // ── Boot ─────────────────────────────────────────────────────────────────

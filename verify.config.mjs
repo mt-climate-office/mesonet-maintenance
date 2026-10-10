@@ -19,10 +19,26 @@
    is an empty box, not a console error. */
 import { load } from '../mco-web-style/tools/verify/lib.mjs';
 
-const dataReady = () => document.querySelectorAll('#sr-station-rows tr').length > 100;
+// Serialized into the page by Playwright: no closures over module scope.
+const dataReady = () => document.querySelectorAll('#sr-station-table tbody tr').length > 100;
 
 // Compliance-mode dot colors (app.js MODES): visited and overdue.
 const DOT_RGB = [[0x2a, 0x8a, 0x86], [0xb8, 0x42, 0x1b]];
+
+// First pixel (in page coordinates) in a dot color, or null.
+async function findDot(page) {
+  const { PNG } = await load('pngjs');
+  const box = await page.locator('#map').boundingBox();
+  const png = PNG.sync.read(await page.screenshot({ clip: box }));
+  const [R, G, B] = DOT_RGB[0];
+  for (let y = 60; y < png.height - 60; y += 2) for (let x = 340; x < png.width - 80; x += 2) {
+    const i = (y * png.width + x) * 4;
+    if (Math.abs(png.data[i] - R) + Math.abs(png.data[i + 1] - G) + Math.abs(png.data[i + 2] - B) < 12) {
+      return { x: box.x + x + 2, y: box.y + y + 2 };
+    }
+  }
+  return null;
+}
 
 async function dotPixels(page) {
   const { PNG } = await load('pngjs');
@@ -46,20 +62,31 @@ export default {
     // A hidden category with the legend open: the 390 default starts with
     // the legend collapsed, so without this its rows are never measured.
     { name: 'legend-off', query: '?cat-compliance=visited+new&legend=open', ready: dataReady },
+    // Every category hidden: the .mco-empty callout over the map.
+    { name: 'empty-state', query: '?cat-compliance=', ready: () => document.querySelectorAll('#sr-station-table tbody tr').length > 100 && !document.getElementById('empty-state').hidden },
     // A station popup open (visit history, pills, photos, links): it only
     // exists after a click, so a load-only scan never audits it.
-    { name: 'station-popup', query: '?station=aceashla&lng=-106.41&lat=45.6&zoom=9', ready: () => !!document.querySelector('.maplibregl-popup .visit-photo-thumb') },
+    { name: 'station-popup', query: '?station=aceashla&lng=-106.41&lat=45.6&zoom=9', ready: () => !!document.querySelector('.maplibregl-popup .visit-photo-thumb, #station-sheet:not([hidden]) .visit-photo-thumb') },
   ],
   exemptTargets: '',
   allowProblems: [],
   dialogOpener: '#btn-info',
   shortcuts: [{ key: '/', effect: () => document.activeElement?.id === 'search-input' }],
-  probes: async ({ open, check }) => {
+  probes: async ({ env, open, check }) => {
     // The map draws its data, not just the basemap.
     {
       const { page, close, problems } = await open('', { ready: dataReady, settleMs: 2500 });
       const n = await dotPixels(page);
       check(`station dots paint on the canvas (${n} px in data colors)`, n > 300, String(n));
+      // Hover a dot: the cursor tooltip names the station and its status.
+      const dot = await findDot(page);
+      if (dot) { await page.mouse.move(dot.x - 3, dot.y - 3); await page.mouse.move(dot.x, dot.y); }
+      await page.waitForTimeout(300);
+      const tip = await page.evaluate(() => {
+        const t = document.getElementById('tooltip');
+        return { vis: t.classList.contains('visible'), text: t.textContent, cursor: document.querySelector('.maplibregl-canvas').style.cursor };
+      });
+      check('hovering a dot shows the tooltip (name, id, status) and a pointer', !!dot && tip.vis && /Visited this year/.test(tip.text) && tip.cursor === 'pointer', JSON.stringify(tip));
       const probs = await problems();
       check('no console / CSP problems on load', probs.length === 0, probs.slice(0, 3).join(' | '));
       // A theme flip calls setStyle, which wipes custom layers: they must
@@ -68,6 +95,191 @@ export default {
       await page.waitForTimeout(4000);
       const n2 = await dotPixels(page);
       check(`station dots repaint after a theme flip (${n2} px)`, n2 > 300, String(n2));
+      await close();
+    }
+    // CARTO down: watchBasemap falls back to a blank style with a notice,
+    // and the stations are re-added on that style.load and still draw.
+    // Chromium only: in Playwright's WebKit, ANY request interception
+    // (ctx.route or page.route) breaks MapLibre's blob: worker ("WebKitBlobResource
+    // error 1" -> "Worker failed to load"), so the map never loads there for
+    // reasons unrelated to the app.
+    if (env.engine === 'chromium') {
+      const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
+      await ctx.route(/basemaps\.cartocdn\.com\/gl\/.*style\.json/, (r) => r.abort());
+      const page = await ctx.newPage();
+      await page.goto(env.base + '?theme=dark');
+      await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
+      const notice = await page.waitForSelector('.mco-notice', { timeout: 30000 }).then(() => true, () => false);
+      await page.waitForTimeout(2500);
+      const n = await dotPixels(page);
+      check(`basemap failure: notice shown and stations still paint (${n} px)`, notice && n > 300, `notice=${notice} px=${n}`);
+      await ctx.close();
+    }
+    // Maintenance feed empty: the warning notice (#data-banner, which the
+    // social-card generator checks) appears over the map with Retry, and the
+    // stations still list. Chromium only, for the same reason as above.
+    if (env.engine === 'chromium') {
+      const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
+      await ctx.route(/\/stations\/maintenance\/live/, (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }));
+      const page = await ctx.newPage();
+      await page.goto(env.base + '?theme=light');
+      await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
+      const st = await page.evaluate(() => {
+        const b = document.getElementById('data-banner');
+        return { vis: !!b && b.offsetParent !== null, text: b?.textContent || '', retry: !!b?.querySelector('.mco-notice-actions button') };
+      });
+      check('empty maintenance feed: #data-banner warning notice with Retry', st.vis && /Warning/.test(st.text) && st.retry, JSON.stringify(st));
+      const { AxeBuilder } = await load('@axe-core/playwright');
+      for (const theme of ['light', 'dark', 'high-contrast']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+        await page.waitForTimeout(800);   // let color transitions finish
+        const r = await new AxeBuilder({ page }).include('#data-banner').analyze();
+        const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+        check(`#data-banner axe-clean in ${theme}`, bad.length === 0, bad.map((v) => v.id).join(','));
+      }
+      await ctx.close();
+    }
+    // Theme toggle cycles dark -> light -> high contrast -> dark, naming the
+    // next theme; the map repaints its data in high contrast.
+    {
+      const { page, close } = await open('?theme=dark', { ready: dataReady });
+      const seen = [];
+      for (let i = 0; i < 3; i++) {
+        const label = await page.getAttribute('#btn-theme', 'aria-label');
+        await page.click('#btn-theme');
+        await page.waitForTimeout(i === 1 ? 4000 : 1500);
+        seen.push([label, await page.evaluate(() => document.documentElement.dataset.theme)]);
+        if (i === 1) seen.push(['hc dots', await dotPixels(page)]);
+      }
+      const ok = seen[0][1] === 'light' && /light/i.test(seen[0][0]) && seen[1][1] === 'high-contrast' && /high contrast/i.test(seen[1][0])
+        && seen[2][1] > 300 && seen[3][1] === 'dark' && /dark/i.test(seen[3][0]);
+      check('theme toggle cycles dark -> light -> high contrast -> dark; HC repaints dots', ok, JSON.stringify(seen));
+      await close();
+    }
+    // Landscape phone (750x342): the bar is a 56px rail; the menu opens the
+    // drawer (focus in, <main> inert), Esc returns focus to the toggle, and
+    // "/" opens the drawer on the search field.
+    {
+      const { page, close } = await open('', { ready: dataReady, viewport: { name: 'land', width: 750, height: 342, touch: true } });
+      const geo = await page.evaluate(() => [document.getElementById('navbar').getBoundingClientRect().width, document.getElementById('map').getBoundingClientRect().height]);
+      await page.click('#btn-rail-menu');
+      await page.waitForTimeout(400);
+      const o = await page.evaluate(() => [document.getElementById('nav-drawer').contains(document.activeElement), document.getElementById('main').inert]);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const c = await page.evaluate(() => [document.activeElement?.id, document.getElementById('main').inert]);
+      await page.keyboard.press('/');
+      await page.waitForTimeout(400);
+      const sl = await page.evaluate(() => document.activeElement?.id);
+      check('750x342: rail (56px, map full height); drawer focus/inert/Esc; "/" -> search',
+        geo[0] <= 60 && geo[1] >= 330 && o[0] && o[1] && c[0] === 'btn-rail-menu' && !c[1] && sl === 'search-input', JSON.stringify({ geo, o, c, sl }));
+      await close();
+    }
+    // Color mode: segmented buttons at 1440, a <select> at <=1060 — one value.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      await page.locator('#mode-seg [data-value="timesince"]').click();
+      await page.waitForTimeout(300);
+      const a = await page.evaluate(() => ({ q: location.search, t: document.getElementById('legend-title').textContent, sel: document.getElementById('mode-select').value }));
+      await page.setViewportSize({ width: 1000, height: 800 });
+      await page.waitForTimeout(400);
+      const vis = await page.evaluate(() => [document.getElementById('mode-seg').hidden, document.getElementById('mode-select').hidden]);
+      await page.selectOption('#mode-select', 'triptype');
+      await page.waitForTimeout(300);
+      const b = await page.evaluate(() => ({ q: location.search, t: document.getElementById('legend-title').textContent, pressed: document.querySelector('#mode-seg [aria-pressed="true"]')?.dataset.value }));
+      check('mode: buttons at 1440, <select> at 1000, mirrored, legend + ?mode= follow',
+        /mode=timesince/.test(a.q) && a.sel === 'timesince' && /Since last/.test(a.t) && vis[0] && !vis[1] && /mode=triptype/.test(b.q) && /trip type/i.test(b.t) && b.pressed === 'triptype',
+        JSON.stringify({ a, vis, b }));
+      await close();
+    }
+    // Legend: click hides a category (and drops it from the map + URL);
+    // Shift+Enter isolates.
+    {
+      const { page, close } = await open('?legend=open', { ready: dataReady });
+      const row = page.locator('#legend-rows [data-key="as_needed"]');
+      await row.click();
+      await page.waitForTimeout(600);
+      const st = await page.evaluate(() => ({
+        pressed: document.querySelector('#legend-rows [data-key="as_needed"]').getAttribute('aria-pressed'),
+        q: location.search,
+        rows: document.querySelectorAll('#sr-station-table tbody tr').length,
+      }));
+      check('legend click hides a category (aria-pressed=false, cat- in URL)', st.pressed === 'false' && /cat-compliance=/.test(st.q), JSON.stringify(st));
+      await page.locator('#legend-rows [data-key="visited"]').focus();
+      await page.keyboard.press('Shift+Enter');
+      await page.waitForTimeout(300);
+      const iso = await page.evaluate(() => [...document.querySelectorAll('#legend-rows [data-key]')].map((r) => r.dataset.key + ':' + r.getAttribute('aria-pressed')).join(','));
+      check('Shift+Enter isolates a legend category', /visited:true/.test(iso) && !/(overdue|new|as_needed):true/.test(iso), iso);
+      await close();
+    }
+    // Search: type, Enter picks the best match, the map flies and opens it.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      await page.locator('#search-input').fill('ashla');
+      await page.waitForTimeout(300);
+      const opts = await page.locator('#search-dropdown [role="option"]:not([aria-disabled])').count();
+      await page.keyboard.press('Enter');
+      const opened = await page.waitForFunction(() => /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), null, { timeout: 15000 }).then(() => true, () => false);
+      check(`search lists matches (${opts}) and Enter opens that station`, opts > 0 && opened);
+      await close();
+    }
+    // Compact: a station opens the bottom sheet (peek), the grip takes it to
+    // full (modal: <main> inert), the lightbox still works from it, and Esc
+    // closes it and drops ?station=.
+    {
+      const { page, close } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      const peek = await page.waitForSelector('#station-sheet[data-state="peek"]', { timeout: 15000 }).then(() => true, () => false);
+      const noPopup = await page.locator('.maplibregl-popup').count() === 0;
+      const title = await page.evaluate(() => [document.getElementById('station-sheet-title').textContent, document.activeElement?.id]);
+      check('compact deep link opens the sheet at peek (no anchored popup), focus on its title', peek && noPopup && title[0] === 'Ashland' && title[1] === 'station-sheet-title', JSON.stringify({ peek, noPopup, title }));
+      await page.locator('#station-sheet .mco-sheet-grip').focus();
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(500);
+      const full = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, inert: document.getElementById('main').inert }));
+      check('grip Enter -> full detent, <main> inert', full.st === 'full' && full.inert, JSON.stringify(full));
+      await page.locator('#station-sheet .visit-photo-thumb').first().click();
+      const lb = await page.waitForFunction(() => document.getElementById('lightbox').open && document.getElementById('lightbox-img').naturalWidth > 0, null, { timeout: 15000 }).then(() => true, () => false);
+      // Usable over the modal sheet: not inert, and Next steps the gallery.
+      const cap0 = await page.textContent('#lightbox-caption');
+      await page.click('#lightbox-next');
+      await page.waitForTimeout(300);
+      const lbUse = await page.evaluate((c0) => ({ inert: document.getElementById('lightbox').inert || !!document.getElementById('lightbox').closest('[inert]'), stepped: document.getElementById('lightbox-caption').textContent !== c0 }), cap0);
+      check('lightbox over the full sheet is live (not inert) and Next steps the gallery', !lbUse.inert && lbUse.stepped, JSON.stringify(lbUse));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      const after1 = await page.evaluate(() => ({ lb: document.getElementById('lightbox').open, st: document.getElementById('station-sheet').dataset.state }));
+      check('lightbox opens from the full sheet; its Esc closes only the lightbox', lb && !after1.lb && after1.st === 'full', JSON.stringify({ lb, ...after1 }));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+      const after = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search, inert: document.getElementById('main').inert }));
+      check('Esc closes the sheet, un-inerts <main>, drops ?station=', after.st === 'closed' && !after.inert && !/station=/.test(after.q), JSON.stringify(after));
+      await close();
+    }
+    // Drill-down history: opening a station pushes ONE entry; Back closes it,
+    // Forward reopens it; Esc on a pushed station steps back over its entry.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      const len0 = await page.evaluate(() => history.length);
+      await page.locator('#search-input').fill('ashla');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.maplibregl-popup', { timeout: 15000 });
+      await page.waitForTimeout(500);
+      const a = await page.evaluate(() => ({ len: history.length, q: location.search }));
+      await page.goBack();
+      await page.waitForTimeout(800);
+      const b = await page.evaluate(() => ({ popup: !!document.querySelector('.maplibregl-popup'), q: location.search }));
+      await page.goForward();
+      await page.waitForTimeout(800);
+      const c = await page.evaluate(() => ({ popup: /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), q: location.search }));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(800);
+      const d = await page.evaluate(() => ({ popup: !!document.querySelector('.maplibregl-popup'), q: location.search }));
+      check('station open pushes one entry; Back closes, Forward reopens, Esc steps back',
+        a.len === len0 + 1 && /station=aceashla/.test(a.q) && !b.popup && !/station=/.test(b.q) && c.popup && /station=aceashla/.test(c.q) && !d.popup && !/station=/.test(d.q),
+        JSON.stringify({ len0, a, b, c, d }));
       await close();
     }
     // Deep link opens the popup, and its visit photos actually load.

@@ -7,7 +7,7 @@ the API and the CDN-pinned libraries in `index.html`.
 ## House style
 
 This app consumes mco-web-style (pinned + SRI in `index.html`; currently
-**v0.11.2** — check the tag in that file rather than trusting this line). Design
+**v0.12.0** — check the tag in that file rather than trusting this line). Design
 tokens, a11y mandates, and interaction conventions: see HOUSE-STYLE.md in
 https://github.com/mt-climate-office/mco-web-style — tokens only (no raw hexes),
 `--accent` is fill-only, `aria-pressed` drives toggle styling, canvas data needs
@@ -48,7 +48,8 @@ A nightly workflow (`.github/workflows/preview.yml`, 08:00 UTC) **commits
 `assets/og-card.png` to `main`**, so pull/rebase before pushing.
 `scripts/generate_preview.py` screenshots the canonical URL with
 `?net=hydromet&labels=on&theme=light`
-and depends on `#refresh-stamp` ("loaded …"), `#data-banner`, and the
+and depends on `#refresh-stamp` ("loaded …"), `#data-banner` (an `MCO.notice`
+whose element app.js gives that id; present only while the feed is down), and the
 `mco-maint-seen-intro` localStorage key; rename any of them and the card
 silently breaks. Its waits must be locators, not `wait_for_function` strings —
 same no-`'unsafe-eval'` CSP as the harness.

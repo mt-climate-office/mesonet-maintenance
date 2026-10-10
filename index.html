@@ -43,9 +43,9 @@
   <!-- Favicons / app icons: hot-linked from the pinned kit tag (kit 0.9.0,
        decided 2026-10-08) so they version with the kit. img-src allows
        cdn.jsdelivr.net for them. The navbar logo stays vendored. -->
-  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/assets/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/assets/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/assets/apple-touch-icon.png">
 
   <!-- Open Graph (Facebook, LinkedIn, Slack, Discord, iMessage, etc.) -->
   <meta property="og:type"             content="website">
@@ -101,8 +101,8 @@
   <!-- House fonts: kit-hosted (mco-web-style 0.7.0), declared in mco-theme.css.
        Preloaded so the first frame is already in Outfit — no system-font flash.
        Same @version as the theme CSS; crossorigin is required on font preloads. -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
   <!-- MapLibre GL 6 (kit 0.8.0+): ES modules only, imported on demand by
        MCO.map.loadMapLibre(). The import map carries the SRI hashes and is ONE
        LINE, byte for byte from the kit snippet, so its CSP sha256 holds. -->
@@ -117,11 +117,11 @@
         integrity="sha384-ntw3zEt6rcVML7jDK0ULmHa5hxLB23afsPqzqfY+gLgMfAkbFCnCgPpkZvV5mmZX"
         crossorigin="anonymous">
 
-  <!-- mco-web-style @0.11.2 — tokens, reset, a11y utilities, navbar/panel/toast/
+  <!-- mco-web-style @0.12.0 — tokens, reset, a11y utilities, navbar/panel/toast/
        tooltip/modal shells, MapLibre control polish. Everything below in
        <style> is what remains app-specific after the kit took the rest. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/theme/mco-theme.css"
-        integrity="sha384-22H/4uZb4dmkrTZlLp4NJ4J+Wg39RNRIVIKO0x1HPYfyUWj81FA0fyM/uoRqbqme"
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/theme/mco-theme.css"
+        integrity="sha384-SVU0zinE4kdg7DL79mgXmebk2GD/Gy4cnCeu/hn3eZSxgg3X+g4Fr4qC0Ou1bE20"
         crossorigin="anonymous">
 
   <style>
@@ -136,26 +136,11 @@
        same network disagree. Their contrast is carried by --dot-stroke on the
        map and by per-pill text colors in the popup (see .pop-pill below). */
     :root {
-      --c-visited:  #2a8a86;  /* teal — compliant this year */
-      --c-overdue:  #b8421b;  /* red — overdue */
-      --c-asneeded: #7a8ba6;  /* slate — AgriMet, as-needed */
-      --c-nodata:   #9aa3b3;  /* grey — no data */
-      --c-new:      #5aaee8;  /* blue — installed this year, exempt */
-      /* Amber: the data-unavailable banner's accent. 7.8:1 on #161b22. */
-      --c-warn:     #e0a32e;
-      --warn-bg:    rgba(224,163,46,0.14);
-    }
-    [data-theme="light"] {
-      /* Darkened from the dark-theme amber, which is only 2.2:1 on the light
-         navbar glass. #7d5a0e is 6.2:1 there and 5.6:1 on --bg-deep. */
-      --c-warn:     #7d5a0e;
-      --warn-bg:    rgba(176,120,20,0.12);
-    }
-    [data-theme="high-contrast"] {
-      /* 14.6:1 on #000000; the dark-theme amber is 9.5:1, which clears AAA but
-         reads as the dim one beside this theme's other accents. */
-      --c-warn:     #ffd166;
-      --warn-bg:    rgba(255,209,102,0.18);
+      --c-visited:  #2a8a86;  /* data color (§6): teal — compliant this year */
+      --c-overdue:  #b8421b;  /* data color (§6): red — overdue */
+      --c-asneeded: #7a8ba6;  /* data color (§6): slate — AgriMet, as-needed */
+      --c-nodata:   #9aa3b3;  /* data color (§6): grey — no data */
+      --c-new:      #5aaee8;  /* data color (§6): blue — installed this year, exempt */
     }
 
     /* ── Navbar (app-specific remainder) ───────────────────────────────────
@@ -181,121 +166,20 @@
     #map-container { flex: 1; min-height: 0; position: relative; }
     #map { width: 100%; height: 100%; }
 
-    /* Empty-state callout — shown when no stations are visible under the
-       current network / legend filters. Positioned center-top, doesn't block
-       map interaction (pointer-events: none on the wrapper; the action button
-       inside re-enables them). */
-    #empty-state {
-      position: absolute;
-      top: 18px; left: 50%; transform: translateX(-50%);
-      z-index: var(--z-map-notice);
-      pointer-events: none;
-      max-width: calc(100% - 32px);
-    }
+    /* Empty-state callout (.mco-empty): the shell and its over-the-map
+       placement are the kit's. It must not block the map under it. */
+    #empty-state { pointer-events: none; }
     #empty-state[hidden] { display: none; }
-    .empty-state-card {
-      pointer-events: auto;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow);
-      padding: 10px 14px;
-      font-size: 0.82rem;
-      color: var(--text-secondary);
-      display: flex; align-items: center; gap: 10px;
-    }
-    .empty-state-card strong { color: var(--text-primary); font-weight: 600; }
+    #empty-state strong { color: var(--text-primary); font-weight: 600; }
+    /* kit-override: on a phone the centered callout ran under the zoom/fit
+       controls (top-right); keep it clear of that 56px column. */
+    @media (max-width: 640px) { #empty-state { max-width: calc(100% - 7.5rem); } }
 
-    /* Data-unavailable banner — shown when the maintenance fetch fails/empty. */
-    #data-banner {
-      position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-      z-index: calc(var(--z-map-notice) + 1); max-width: calc(100% - 32px);
-    }
-    #data-banner[hidden] { display: none; }
-    #data-banner .empty-state-card { background: var(--warn-bg); border-color: var(--c-warn); }
-    #data-banner strong { color: var(--text-primary); }
-
-    /* ── Search input (primary action; lives in navbar) ──────────────────── */
-    .search-wrap { position: relative; display: inline-flex; align-items: center; }
-    input[type="search"] {
-      /* Solid bg (not rgba) so it can't be visually replaced by Chrome's
-         autofill mask. The autofill rule below uses the same color. */
-      background-color: var(--input-bg);
-      color: var(--text-primary);
-      border: 1px solid var(--border); border-radius: var(--radius-md);
-      padding: 0 36px 0 30px; height: 32px;
-      width: 240px; max-width: 100%;
-      font-size: 0.82rem; font-family: inherit;
-      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a8190' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
-      background-repeat: no-repeat;
-      background-position: 8px center;
-      background-size: 14px 14px;
-      transition: var(--transition), width 0.18s ease-out;
-    }
-    input[type="search"]:hover { border-color: var(--accent); }
-    /* Widen and tint the border on focus, but do NOT kill the outline: the
-       kit's universal :focus-visible ring is the actual focus indicator
-       (WCAG 2.4.7), and this selector is specific enough to have been
-       overriding it. */
-    input[type="search"]:focus { border-color: var(--accent-light); width: 280px; }
-    input[type="search"]::-webkit-search-cancel-button { filter: var(--ctrl-icon-filter, none); }
-    input[type="search"]::placeholder { color: var(--text-muted); opacity: 1; }
-
-    /* Custom search suggestions listbox — replaces native <datalist> so the
-       popup is themed (the native popup is unstylable Chrome UI). */
-    #search-dropdown {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0; right: 0;
-      min-width: 100%;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow);
-      list-style: none;
-      margin: 0; padding: 4px;
-      max-height: 280px;
-      overflow-y: auto;
-      z-index: var(--z-flyout);
-    }
-    #search-dropdown[hidden] { display: none; }
-    #search-dropdown li {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 5px 8px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      border-radius: var(--radius-sm);
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-    }
-    #search-dropdown li:hover,
-    #search-dropdown li.active {
-      background: var(--accent-hover);
-      color: var(--text-primary);
-    }
-    #search-dropdown li.empty {
-      color: var(--text-muted);
-      font-style: italic;
-      cursor: default;
-    }
-    #search-dropdown li.empty:hover { background: none; }
-    #search-dropdown .search-name {
-      flex: 1; min-width: 0;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-    #search-dropdown .search-meta {
-      flex-shrink: 0;
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      /* --text-secondary, not --text-muted: --text-muted on --bg-surface
-         drops to ~4.4:1 (just under WCAG AA 4.5:1). */
-      color: var(--text-secondary);
-    }
-
+    /* ── Search (the kit's .mco-search, MCO.initSearchBox) ────────────────
+       Field, icon and listbox are kit-owned. Only the "/" hint is this map's. */
+    /* kit-override: room on the right for the "/" hint, which the kit's
+       field (padding-right 10px) doesn't carry. */
+    #search-input { padding-right: 30px; }
     .search-kbd {
       position: absolute;
       right: 6px; top: 50%;
@@ -310,28 +194,13 @@
       transition: opacity 0.15s;
     }
     /* Hide the / hint once the user has focused the search (or while typing). */
-    .search-wrap:focus-within .search-kbd { opacity: 0; }
+    .mco-search:focus-within .search-kbd { opacity: 0; }   /* kit-override (scoped): only hides this app's / hint; no .mco-search style changes */
 
-    /* ── Sub-network chips (navbar toggles) ───────────────────────────────── */
-    .chip-group { display: flex; gap: 4px; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 5px;
-      height: 30px; padding: 0 9px;
-      border: 1px solid var(--border); border-radius: 999px;
-      background: none; color: var(--text-secondary);
-      font: inherit; font-size: 0.72rem; font-weight: 600;
-      cursor: pointer; white-space: nowrap;
-      transition: var(--transition);
-    }
-    .chip:hover { border-color: var(--accent-line); color: var(--text-primary); background: var(--accent-hover); }
-    .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent-line); color: var(--text-on-accent); }
-    .chip .chip-count {
-      font-family: var(--font-mono); font-size: 0.65rem;
-      padding: 1px 5px; border-radius: 999px;
-      background: var(--border-glass); color: inherit;
-    }
-    /* Keep the count badge legible when the chip is pressed (accent background). */
-    .chip[aria-pressed="true"] .chip-count { background: rgba(0,0,0,0.28); color: var(--text-on-accent); }
+    /* ── Sub-network chips (navbar toggles) ─────────────────────────────────
+       The kit's .mco-chips / .mco-chip (0.9.0): pressed is a tint plus a ✓,
+       a non-color cue, and 40px on touch. Only the row's nowrap is ours: the
+       group sits in the navbar's control row. */
+    #subnet-filters { flex-wrap: nowrap; }
 
     /* ── Legend (bottom-left, collapsible) ────────────────────────────────── */
     /* The panel shell, its header/title/toggle, the caret rotation and the
@@ -342,24 +211,8 @@
       left: 12px;
       min-width: 200px;
     }
-    .legend-row {
-      display: flex; align-items: center; gap: 7px;
-      padding: 3px 6px; margin: 0;
-      width: 100%; text-align: left;
-      background: none; border: 0; font: inherit; color: inherit;
-      border-radius: 4px; cursor: pointer;
-      transition: background var(--transition), opacity var(--transition);
-    }
-    /* Hover and keyboard focus share the background tint, but the focus RING
-       is the kit's universal :focus-visible rule — the old `outline: none`
-       here removed it and left keyboard users with only a faint tint to tell
-       them where they were. */
-    .legend-row:hover, .legend-row:focus-visible { background: var(--accent-hover); }
-    .legend-row.off { opacity: 0.4; }
-    .legend-row.off .legend-lbl { text-decoration: line-through; }
-    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border-glass); }
-    .legend-lbl { font-size: 0.74rem; color: var(--text-secondary); white-space: nowrap; flex: 1; }
-    .legend-count { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-muted); flex-shrink: 0; }
+    /* Rows are the kit's .mco-legend-row (MCO.initLegendToggles); only the
+       hint line under them is this map's. */
     .legend-hint {
       margin-top: 6px; padding: 0 4px;
       font-size: 0.62rem; font-style: italic;
@@ -367,28 +220,9 @@
     }
 
     /* ── Popup ─────────────────────────────────────────────────────────────── */
-    /* MapLibre popups ship with NO z-index, so they need a tier of their own.
-       --z-detail sits above the legend panel and the map notices, and below the
-       search dropdown (--z-flyout), the tooltip (--z-cursor) and the navbar.
-       A popup opening over the bottom-left legend stays fully readable and
-       clickable, which is the behaviour the old hard-coded 40 was chosen for. */
-    .maplibregl-popup { max-width: 340px !important; z-index: var(--z-detail); }
-    .maplibregl-popup-content {
-      background: var(--bg-surface) !important;
-      color: var(--text-primary) !important;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md) !important;
-      padding: 12px 14px 12px !important;
-      box-shadow: var(--shadow) !important;
-      font-family: var(--font-ui);
-    }
-    .maplibregl-popup-tip { border-top-color: var(--bg-surface) !important; border-bottom-color: var(--bg-surface) !important; }
-    .maplibregl-popup-close-button {
-      color: var(--text-muted) !important;
-      font-size: 1.1rem !important; padding: 2px 6px !important;
-    }
-    .pop-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); line-height: 1.2; padding-right: 18px; }
-    .pop-sub   { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+    /* The shell (surface, border, tip, close button, z tier, title/subtitle,
+       action bar) is the kit's: MCO.map.popupContent + .mco-popup. What
+       follows is this map's visit history inside it. */
     /* Pill text is 0.64rem bold — "normal text" by WCAG's sizing rule, so each
        pill needs 4.5:1 against its OWN fill (1.4.3). Three were white on a
        light fill and failed before this migration: new was 2.43:1, as_needed
@@ -399,16 +233,18 @@
       display: inline-block; font-size: 0.64rem; font-weight: 600; padding: 2px 8px;
       border-radius: 999px; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.04em;
     }
-    .pop-pill.visited   { background: var(--c-visited);  color: #000000; }  /* 5.08:1 */
-    .pop-pill.overdue   { background: var(--c-overdue);  color: #ffffff; }  /* 5.48:1 */
-    .pop-pill.new       { background: var(--c-new);      color: #1a1a2e; }  /* 7.03:1 */
-    .pop-pill.as_needed { background: var(--c-asneeded); color: #1a1a2e; }  /* 4.93:1 */
-    .pop-pill.nodata    { background: var(--c-nodata);   color: #1a1a2e; }  /* 6.71:1 */
+    .pop-pill.visited   { background: var(--c-visited);  color: #000000; }  /* contrast 5.08:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.overdue   { background: var(--c-overdue);  color: #ffffff; }  /* contrast 5.48:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.new       { background: var(--c-new);      color: #1a1a2e; }  /* contrast 7.03:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.as_needed { background: var(--c-asneeded); color: #1a1a2e; }  /* contrast 4.93:1 on its fill (WCAG 1.4.3) */
+    .pop-pill.nodata    { background: var(--c-nodata);   color: #1a1a2e; }  /* contrast 6.71:1 on its fill (WCAG 1.4.3) */
+    /* Label/value pairs are the kit's .mco-facts. A state that needs a
+       sentence instead ("AgriMet station — visited as needed…") gets this
+       note. It is plain text on the popup surface, not --text-muted on a
+       raised box. */
     .pop-summary {
-      margin-top: 8px; padding: 6px 8px; background: var(--bg-raised); border-radius: var(--radius-sm);
-      font-size: 0.74rem; color: var(--text-secondary); line-height: 1.45;
+      margin: 8px 0 0; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.45;
     }
-    .pop-summary strong { color: var(--text-primary); font-weight: 600; }
     .pop-section-title {
       margin-top: 11px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.07em;
       text-transform: uppercase; color: var(--text-muted);
@@ -418,6 +254,7 @@
     .visit-item { padding: 6px 2px; border-bottom: 1px solid var(--border-glass); font-size: 0.73rem; }
     .visit-item:last-child { border-bottom: 0; }
     .visit-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .visit-rel { color: var(--text-muted); }
     .visit-date { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); font-weight: 600; }
     .trip-chip {
       font-size: 0.6rem; font-weight: 600; padding: 1px 6px; border-radius: 999px;
@@ -439,9 +276,6 @@
     .visit-tasks ul { margin: 3px 0 0 8px; padding: 0 0 0 14px; }
     .visit-tasks li { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4; list-style: disc; }
     .pop-empty { font-size: 0.72rem; color: var(--text-muted); font-style: italic; padding: 4px 2px; }
-    .pop-links { margin-top: 10px; }
-    .pop-links a { font-size: 0.78rem; color: var(--accent-light); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-    .pop-links a:hover { text-decoration: underline; }
 
     /* ── Visit photos + lightbox ─────────────────────────────────────────── */
     .visit-photos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
@@ -461,14 +295,14 @@
       display: block; max-width: min(1200px, calc(100vw - 4rem));
       max-height: calc(100dvh - 5rem); border-radius: 6px; object-fit: contain;
     }
-    .lightbox-caption { text-align: center; color: #ccc; font-size: 0.8rem; margin-top: 0.5rem; }
+    .lightbox-caption { text-align: center; color: #ccc; font-size: 0.8rem; margin-top: 0.5rem; }   /* contrast ~11:1 on the 88% black ::backdrop, every theme (WCAG 1.4.3) */
     .lightbox-close {
       position: absolute; top: -2rem; right: 0; background: none; border: none;
-      color: #fff; font-size: 1.75rem; line-height: 1; cursor: pointer; padding: 0 0.25rem;
+      color: #fff; font-size: 1.75rem; line-height: 1; cursor: pointer; padding: 0 0.25rem;   /* contrast ~18:1 on the 88% black ::backdrop (WCAG 1.4.11) */
     }
     .lightbox-nav {
       position: absolute; top: 50%; transform: translateY(-50%);
-      background: rgba(0,0,0,0.45); border: none; color: #fff;
+      background: rgba(0,0,0,0.45); border: none; color: #fff;   /* over a photo: contrast >= 3:1 against any pixel under the 45% black chip (WCAG 1.4.11) */
       font-size: 2rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.7rem;
       border-radius: 6px; transition: background var(--transition);
     }
@@ -478,62 +312,52 @@
     @media (hover: none) { .visit-photo-thumb { width: 52px; height: 52px; } .lightbox-nav { font-size: 2.4rem; } }
 
 
-    /* ── Tooltip (app-specific lines) ───────────────────────────────────────
-       The kit owns .mco-tooltip and its .tooltip-name / .tooltip-sub. It also
-       ships .tooltip-val — but that is a monospace, accent-colored VALUE line
-       ("42°F"), and what this map needs is a prose status line. Restoring the
-       two classes the kit does not own; without them these lines lose their
-       display:block and collapse onto one row. */
-    .mco-tooltip .tooltip-line {
-      display: block;
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-      margin-top: 3px;
-    }
-    .mco-tooltip .tooltip-rel {
-      display: block;
-      font-size: 0.7rem;
-      color: var(--accent-line);
-      font-weight: 500;
-      margin-top: 1px;
-    }
-
     /* ── Responsive ────────────────────────────────────────────────────────── */
     /* The kit owns the ladder above this: the ≤1400px button-label shed and the
        ≤750px collapse of the brand lockup to the logo badge (title and subtitle
        are hidden visually, not removed, so the <h1> outline survives). This map
        adds only its own controls break.
 
-       Below ~1200px the primary controls (search + mode + networks) drop to a
-       dedicated second row; row 1 keeps branding on the left and
-       refresh/labels/theme/info on the right. CSS `order` swaps the visual
-       position without disturbing tab order — search stays keyboard-reachable
-       early via the / shortcut. 1200 rather than the kit's 1060 because this
-       bar carries a segmented control, chips, a search field and four nav
-       buttons. */
-    @media (max-width: 1200px) {
-      .nav-meta  { order: 1; }
-      .controls  { order: 2; flex-basis: 100%; margin-left: 0; }
+       At <=1060px (the kit's ladder rung) the color-mode segmented group
+       becomes a <select> (MCO.initSegmentedFallback). */
+    /* kit-override: the primary controls take a whole second row at the
+       kit's 1400px rung. This bar needs ~1290px in one row: lockup 280,
+       search 220, the mode group 230, chips 220, and stamp plus four
+       buttons 300. Shedding the mode group to a <select> at 1060 saves
+       ~110px, which isn't enough. The old break sat at an off-ladder 1200px,
+       so from 1201 to ~1299px the bar wrapped on its own and stranded the
+       nav buttons on a ragged second row (measured 2026-10-09: 94px tall,
+       both engines). Below 1400, row 1 is branding plus the nav buttons and
+       row 2 the controls (CSS order; tab order is unchanged). */
+    @media (max-width: 1400px) {
+      .nav-meta  { order: 1; }                                   /* kit-override: 2-row bar, see above */
+      .controls  { order: 2; flex-basis: 100%; margin-left: 0; } /* kit-override: 2-row bar, see above */
     }
+    .mode-select {
+      height: 32px; padding: 0 28px 0 10px;
+      background-color: var(--input-bg); color: var(--text-primary);
+      border: 1px solid var(--ctrl-border); border-radius: var(--radius-md);
+      font: inherit; font-size: 0.82rem; cursor: pointer;
+    }
+    .mode-select:hover { border-color: var(--accent-line); }
+    .mode-select[hidden] { display: none; }
     @media (max-width: 1060px) {
-      .nav-meta { gap: 0.3rem; }
+      .nav-meta { gap: 0.3rem; }   /* kit-override: tighter nav buttons beside the lockup on tablets */
     }
     /* At ≤640px the kit collapses the search field into its disclosure button,
        so the field's own width rules no longer apply: it is either display:none
        or flexed to fill the overlay bar. */
     @media (max-width: 640px) {
-      .refresh-status { display: none; }   /* reclaim space on phones */
+      .refresh-status { display: none; }   /* kit-override: reclaim space on phones; the stamp is decorative */
     }
     /* WCAG 2.5.5 — comfortable touch targets on touch-only devices. The kit
        already sizes .nav-btn, .seg-btn, .mco-btn-info and .mco-panel-toggle;
        what is left here is this map's own controls. */
     @media (hover: none) {
-      .chip, input[type="search"] { min-height: 40px; }
-      #search-dropdown li { min-height: 40px; padding: 10px 8px; }
-      .legend-row { min-height: 40px; padding: 7px 6px; }   /* 40px: HOUSE-STYLE §5.5 (0.9.0's 390px gate) */
       /* Popup controls the 390px touch gate found (kit 0.9.0): the tasks
-         disclosure and the dashboard link were 20px tall. */
-      .visit-tasks > summary, .pop-links a { min-height: 40px; }
+         disclosure was 20px tall. (The dashboard link is now a kit .nav-btn.) */
+      .visit-tasks > summary { min-height: 40px; }
+      .mode-select { height: 40px; }   /* height, not min-height: WebKit ignores the latter on <select> */
     }
   </style>
 </head>
@@ -542,7 +366,12 @@
 <!-- WCAG 2.4.1 — first focusable element on the page, jumps past the navbar. -->
 <a class="mco-skip-link" href="#main">Skip to map</a>
 
-<header id="navbar" class="mco-navbar">
+<!-- data-rail (kit 0.10.0): on a landscape phone (the landscape half of the
+     compact query, ~750x342) the bar becomes a 56px left rail and the rest
+     of it opens as a drawer beside the rail (MCO.initNavRail). Elsewhere
+     .mco-rail is display:none and .mco-nav-drawer is display:contents, so
+     the bar lays out exactly as before. -->
+<header id="navbar" class="mco-navbar" data-rail>
   <a href="https://climate.umt.edu" target="_blank" rel="noopener noreferrer"
      class="logo-link" aria-label="Montana Climate Office">
     <!-- Vendored, not hot-linked: img-src is enumerated in the CSP above, and a
@@ -550,8 +379,23 @@
     <img src="assets/mco-logo.png" alt="" class="logo-img" width="40" height="40">
   </a>
 
+  <div class="mco-rail">
+    <button type="button" class="nav-btn icon-only" id="btn-rail-menu" aria-label="Menu"
+            aria-controls="nav-drawer" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <button type="button" class="nav-btn icon-only" id="btn-rail-search" aria-label="Search stations">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </button>
+  </div>
+
   <div class="nav-divider" aria-hidden="true"></div>
 
+  <div class="mco-nav-drawer" id="nav-drawer">
   <div class="brand">
     <h1 class="brand-title">Mesonet Station Maintenance</h1>
     <span class="brand-subtitle">A service of the Montana Climate Office</span>
@@ -560,29 +404,32 @@
   <div class="controls">
     <!-- Primary action: search a station. Press / anywhere to jump here.
          Custom listbox dropdown (not <datalist>) so the popup is fully themed. -->
-    <div class="search-wrap mco-search-collapse" id="search-wrap">
+    <div class="mco-search mco-search-collapse" id="search-wrap">
+      <span class="mco-search-icon" aria-hidden="true"></span>
       <label for="search-input" class="sr-only">Search stations</label>
-      <input type="search" id="search-input"
-             role="combobox" aria-autocomplete="list" aria-haspopup="listbox"
-             aria-controls="search-dropdown" aria-expanded="false"
+      <!-- MCO.initSearchBox wires role=combobox and its aria-* at boot. -->
+      <input type="search" id="search-input" class="mco-search-input"
              placeholder="Search stations…" autocomplete="off">
       <kbd class="search-kbd" aria-hidden="true">/</kbd>
-      <!-- A deliberate WAI-ARIA listbox rather than a <select>: each row carries
-           the station name plus its sub-network and status as secondary text,
-           and the popup is themed — neither is possible in a native listbox. -->
-      <!-- [html-validate-disable-next prefer-native-element] -->
-      <ul id="search-dropdown" role="listbox" hidden></ul>
+      <div id="search-dropdown" class="mco-search-list" hidden></div>
     </div>
 
     <!-- Mode (radio): exactly one of these is active. Joined segmented buttons. -->
-    <div class="seg-btns" role="group" aria-label="Color mode">
-      <button type="button" class="nav-btn seg-btn" data-mode="compliance" aria-pressed="true">Compliance</button>
-      <button type="button" class="nav-btn seg-btn" data-mode="timesince"  aria-pressed="false">Time since</button>
-      <button type="button" class="nav-btn seg-btn" data-mode="triptype"   aria-pressed="false">Trip type</button>
+    <div class="seg-btns" id="mode-seg" role="group" aria-label="Color mode">
+      <button type="button" class="nav-btn seg-btn" data-value="compliance" aria-pressed="true">Compliance</button>
+      <button type="button" class="nav-btn seg-btn" data-value="timesince"  aria-pressed="false">Time since</button>
+      <button type="button" class="nav-btn seg-btn" data-value="triptype"   aria-pressed="false">Trip type</button>
     </div>
+    <!-- The same choice at <=1060px (MCO.initSegmentedFallback). -->
+    <label for="mode-select" class="sr-only">Color mode</label>
+    <select id="mode-select" class="mode-select" hidden>
+      <option value="compliance">Compliance</option>
+      <option value="timesince">Time since</option>
+      <option value="triptype">Trip type</option>
+    </select>
 
     <!-- Networks (multi-select): any combination. Pills with a check on active. -->
-    <div class="chip-group" id="subnet-filters" role="group" aria-label="Sub-network filter"></div>
+    <div class="mco-chips" id="subnet-filters" role="group" aria-label="Sub-network filter"></div>
   </div>
 
   <div class="nav-meta">
@@ -614,7 +461,9 @@
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
       </svg>
     </button>
-    <button type="button" class="nav-btn icon-only" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">
+    <!-- 3-state theme toggle (kit 0.10.0, cycle): dark -> light -> high
+         contrast. The icon and aria-label show the NEXT theme. -->
+    <button type="button" class="nav-btn icon-only" id="btn-theme" title="Switch theme" aria-label="Switch theme">
       <svg id="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -629,20 +478,25 @@
         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
       </svg>
+      <svg id="icon-contrast" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none">
+        <circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>
+      </svg>
     </button>
     <button type="button" class="nav-btn mco-btn-info" id="btn-info" aria-label="About this map">?</button>
   </div>
+  </div><!-- /.mco-nav-drawer -->
 </header>
+<div class="mco-scrim" id="rail-scrim" aria-hidden="true" hidden></div>
 
 <main id="main" tabindex="-1">
 <div id="map-container">
-  <div id="map" role="application" aria-label="Mesonet station maintenance map"></div>
-  <!-- Shown when the maintenance fetch fails or returns nothing. -->
-  <div id="data-banner" hidden role="status" aria-live="polite">
-    <div class="empty-state-card"><strong>Maintenance data unavailable.</strong>&nbsp;Showing stations without visit status — try Refresh.</div>
-  </div>
+  <div id="map" role="application" aria-label="Mesonet station maintenance map. The data is in the table that follows."></div>
+  <!-- #data-banner: an MCO.notice app.js adds here when the maintenance
+       feed fails or returns nothing (setDataNotice). -->
   <!-- Centered message overlay; shown when no stations match the active filters. -->
-  <div id="empty-state" hidden role="status" aria-live="polite"></div>
+  <!-- The kit's .mco-empty callout, floated over the map (data-place). -->
+  <div id="empty-state" class="mco-empty" data-place="over" hidden role="status" aria-live="polite"></div>
 
   <aside id="legend" class="mco-panel" aria-labelledby="legend-title">
     <div class="legend-header mco-panel-head" id="legend-header">
@@ -665,28 +519,27 @@
   </aside>
 </div>
 
-<!-- Screen-reader twin of the map canvas: one row per visible station, rebuilt
-     on every repaint. WebGL output is invisible to assistive tech, so this
-     table is the only way the maintenance status is readable without sight. -->
-<table id="sr-station-table" class="sr-only">
-  <caption>Mesonet stations and their maintenance-visit status</caption>
-  <thead>
-    <tr>
-      <th scope="col">Station</th><th scope="col">ID</th>
-      <th scope="col">Sub-network</th><th scope="col">Status</th>
-      <th scope="col">Last visit</th>
-    </tr>
-  </thead>
-  <tbody id="sr-station-rows"></tbody>
-</table>
+<!-- The screen-reader twin of the map canvas (one row per visible station,
+     rebuilt on every repaint) is MCO.srTable's, appended here by app.js. -->
 </main>
 
+<!-- Station detail on compact viewports (MCO.initSheet); app.js fills it.
+     Outside <main> so its full detent can make <main> and the navbar inert
+     while the dialogs stay live. -->
+<section class="mco-sheet" id="station-sheet" aria-labelledby="station-sheet-title" data-state="closed" hidden>
+  <div class="mco-sheet-head">
+    <button type="button" class="mco-sheet-grip" aria-label="Expand details" aria-expanded="false"></button>
+    <h2 class="mco-sheet-title" id="station-sheet-title" tabindex="-1">Station</h2>
+    <button type="button" class="modal-close" data-close-sheet aria-label="Close">×</button>
+  </div>
+  <div class="mco-sheet-body"></div>
+</section>
+
 <!-- Tooltip is purely visual: anchored to cursor, no focusable trigger, so it
-     would never be surfaced to a screen reader. The aria-live #sr-announce
-     region below covers SR notifications. The toast element is gone — the kit
-     creates and owns its own (.mco-toast) on first MCO.showToast() call. -->
+     would never be surfaced to a screen reader. SR notifications go through
+     MCO.announce, whose live region the kit creates. The kit also creates and
+     owns the toast (.mco-toast) on first MCO.showToast() call. -->
 <div id="tooltip" class="mco-tooltip" aria-hidden="true"></div>
-<div id="sr-announce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
 <dialog id="info-modal" class="mco-modal" aria-labelledby="info-modal-title">
   <div class="info-modal-box">
@@ -721,6 +574,7 @@
         <li><strong>Hover</strong> a dot for its status; <strong>click</strong> for the full visit history + dashboard link.</li>
         <li><strong>Numbered dots</strong> — multiple stations share that location. Hover or tap to fan them out; click one for its details.</li>
         <li><kbd>Esc</kbd> closes any popup or fan-out.</li>
+        <li>Using speech input? Add <code>?kbd=off</code> to the address to turn off the <kbd>/</kbd> shortcut.</li>
       </ul>
     </div>
 
@@ -743,19 +597,19 @@
   <div class="lightbox-caption" id="lightbox-caption"></div>
 </dialog>
 
-<!-- mco-web-style @0.11.2 — classic scripts, so they must precede app.js.
+<!-- mco-web-style @0.12.0 — classic scripts, so they must precede app.js.
      MapLibre is not among them: mco-map.js imports it on demand
      (MCO.map.loadMapLibre). mco-palette.js precedes mco-map.js, whose
      markerPaint() reads it. SRI hashes are the kit README's table for this
      exact tag; bumping @version without recomputing them hard-fails in the
      browser, which is the point. -->
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/core/mco-core.js"
-        integrity="sha384-b4r3+tK/yiZ4TNEllSsbDX3qW0NhcHDsF2iPzUWunUc2vNf1qlq9t9qo2YWgoZiK"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/core/mco-core.js"
+        integrity="sha384-hwEGm+GrEB8L4Msos8t4L3tzlXRPiHR11CFgFn1jYSvD4izhSHQJIodHgm4ZuRf8"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/palette/mco-palette.js"
-        integrity="sha384-P+8vdCR12oZ388lO/orPRnm6Tcz69x6mhN32l7AWP7j8S7KCNijXDZrmYjWuXm8J"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/palette/mco-palette.js"
+        integrity="sha384-nmQlqM0DO86ApUoiACDt0cl/bUjemVhSUytRow9vdP1ydxnXGamD81mumft3n41L"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.11.2/map/mco-map.js"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.12.0/map/mco-map.js"
         integrity="sha384-tmDqtqi4yYiDHOxkZikwzXF3Lpkb63b0Tu6K7jeCpU9gJkPB2GbpFHLasGHka6zP"
         crossorigin="anonymous"></script>
 
