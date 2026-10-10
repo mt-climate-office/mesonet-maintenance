@@ -63,22 +63,17 @@
     timesince: {
       catKey: 'timeBinKey',
       legendTitle: 'Since last Maintenance',
-      // Crameri "roma" (Kyle's decision, 2026-10-09/10: the family's recency
-      // ramp, the same five stops as mesonet-status's time-since bins, so the
-      // two maps read alike). Diverging and CVD-safe, teal = fresh → red =
-      // stale, sampled toward the centre so both ends stay vivid. The kit's
-      // MCO.palette has no roma (only cyclic romaO), so the stops are listed
-      // here as data colors (§6). Accepted with the decision: lightness isn't
-      // monotonic, and some fills sit under 3:1 on --bg-surface (dark: > 1
-      // year 2.81; light: 1–3 mo 2.06, 3–6 mo 1.39, 6–12 mo 2.81). The kit's
-      // --dot-stroke outline carries the edge instead: 14–21:1 against the
-      // surface in every theme.
+      // Kit roma, option B (Kyle, 2026-10-10): MCO.palette.sample('roma', 5,
+      // {from: .1, to: .9, reverse: true}), newest (blue) -> oldest (brown).
+      // The one sample feeds the map paint and the legend swatches
+      // (TIME_SINCE_COLORS below). A diverging ramp has no 3:1 span; the
+      // kit's --dot-stroke outline carries the mark edge (14-21:1).
       cats: [
-        { key: '0',    color: '#2a8a86', label: '< 1 month' },
-        { key: '1',    color: '#84c2a0', label: '1–3 months' },
-        { key: '2',    color: '#f4d88e', label: '3–6 months' },
-        { key: '3',    color: '#d4894a', label: '6–12 months' },
-        { key: '4',    color: '#b8421b', label: '> 1 year' },
+        { key: '0',    label: '< 1 month' },
+        { key: '1',    label: '1–3 months' },
+        { key: '2',    label: '3–6 months' },
+        { key: '3',    label: '6–12 months' },
+        { key: '4',    label: '> 1 year' },
         { key: 'null', color: '#9aa3b3', label: 'Never / no data' },
       ],
     },
@@ -98,6 +93,9 @@
     },
   };
   const MODE_NAMES = Object.keys(MODES);
+  // Time-since bin colors: one sample of the kit's roma (palette 0.12.0).
+  const TIME_SINCE_COLORS = MCO.palette.sample('roma', 5, { from: 0.1, to: 0.9, reverse: true });
+  MODES.timesince.cats.forEach((c, i) => { if (i < TIME_SINCE_COLORS.length) c.color = TIME_SINCE_COLORS[i]; });
 
   const bucketKey = (lat, lon) =>
     `${lat.toFixed(BUCKET_PRECISION)},${lon.toFixed(BUCKET_PRECISION)}`;
