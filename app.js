@@ -63,18 +63,22 @@
     timesince: {
       catKey: 'timeBinKey',
       legendTitle: 'Since last Maintenance',
-      // Ordered bins, so an ordered ramp: MCO.palette's YlOrRd, sampled per
-      // theme inside its 3:1 mark span (syncRampColors). The old hand-picked
-      // teal → pale green → pale yellow → orange → red went light and back to
-      // dark, so "lighter" didn't mean "older" (HOUSE-STYLE §6). Colors are
-      // filled in at paint time.
-      ramp: 'YlOrRd',
+      // Crameri "roma" (Kyle's decision, 2026-10-09/10: the family's recency
+      // ramp, the same five stops as mesonet-status's time-since bins, so the
+      // two maps read alike). Diverging and CVD-safe, teal = fresh → red =
+      // stale, sampled toward the centre so both ends stay vivid. The kit's
+      // MCO.palette has no roma (only cyclic romaO), so the stops are listed
+      // here as data colors (§6). Accepted with the decision: lightness isn't
+      // monotonic, and some fills sit under 3:1 on --bg-surface (dark: > 1
+      // year 2.81; light: 1–3 mo 2.06, 3–6 mo 1.39, 6–12 mo 2.81). The kit's
+      // --dot-stroke outline carries the edge instead: 14–21:1 against the
+      // surface in every theme.
       cats: [
-        { key: '0',    color: null, label: '< 1 month' },
-        { key: '1',    color: null, label: '1–3 months' },
-        { key: '2',    color: null, label: '3–6 months' },
-        { key: '3',    color: null, label: '6–12 months' },
-        { key: '4',    color: null, label: '> 1 year' },
+        { key: '0',    color: '#2a8a86', label: '< 1 month' },
+        { key: '1',    color: '#84c2a0', label: '1–3 months' },
+        { key: '2',    color: '#f4d88e', label: '3–6 months' },
+        { key: '3',    color: '#d4894a', label: '6–12 months' },
+        { key: '4',    color: '#b8421b', label: '> 1 year' },
         { key: 'null', color: '#9aa3b3', label: 'Never / no data' },
       ],
     },
@@ -94,18 +98,6 @@
     },
   };
   const MODE_NAMES = Object.keys(MODES);
-  // Fill a ramp mode's bin colors for the current theme: n evenly spaced
-  // samples across the span where every mark clears 3:1 on --bg-surface.
-  function syncRampColors() {
-    const theme = MCO.getTheme();
-    for (const m of Object.values(MODES)) {
-      if (!m.ramp) continue;
-      const bins = m.cats.filter((c) => c.key !== 'null');
-      const cols = MCO.palette.sample(m.ramp, bins.length, MCO.palette.span(m.ramp, theme));
-      bins.forEach((c, i) => { c.color = cols[i]; });
-    }
-  }
-  syncRampColors();
 
   const bucketKey = (lat, lon) =>
     `${lat.toFixed(BUCKET_PRECISION)},${lon.toFixed(BUCKET_PRECISION)}`;
@@ -547,7 +539,6 @@
   // ── Paint expression generators ──────────────────────────────────────────
   // Simple match on the active mode's catKey → its category colors.
   function paintColorForMode(mode) {
-    syncRampColors();
     const m = MODES[mode];
     const expr = ['match', ['get', m.catKey]];
     for (const c of m.cats) expr.push(c.key, c.color);
@@ -1741,7 +1732,6 @@
   // controller is rebuilt with them.
   let _legendCtl = null;
   function renderLegend() {
-    syncRampColors();
     if (_legendCtl) { _legendCtl.dispose(); _legendCtl = null; }
     legendRowsEl.innerHTML = '';
     const m = MODES[activeMode];
