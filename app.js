@@ -57,7 +57,7 @@
         { key: 'as_needed', color: '#7a8ba6', label: 'AgriMet (as-needed)' },
         // 'nodata' only occurs on a total fetch failure (every station at once,
         // covered by the banner). Kept for paint/filter but hidden from the legend.
-        { key: 'nodata',    color: '#9aa3b3', label: 'No data', hidden: true },
+        { key: 'nodata',    color: '#9aa3b3', label: 'No data', hidden: true, hollow: true },
       ],
     },
     timesince: {
@@ -74,7 +74,7 @@
         { key: '2',    label: '3–6 months' },
         { key: '3',    label: '6–12 months' },
         { key: '4',    label: '> 1 year' },
-        { key: 'null', color: '#9aa3b3', label: 'Never / no data' },
+        { key: 'null', color: '#9aa3b3', label: 'Never / no data', hollow: true },
       ],
     },
     triptype: {
@@ -544,6 +544,26 @@
     return expr;
   }
 
+  // `hollow` categories (no data) are drawn unfilled: a 2px --dot-stroke
+  // edge alone, the same edge contrast every dot has. A grey fill can't stay
+  // clear of the roma ramp, which runs dark → light → dark: #9aa3b3 was
+  // 1.04:1 and OKLab ΔE 4.2 from the 1–3 month cyan under protanopia
+  // (Machado 2009), and no neutral from #37373f to #ebebf3 clears ΔE 15 from
+  // all five bins. Same treatment as mesonet-status's "No record".
+  function hollowMatch(mode) {
+    const m = MODES[mode];
+    const keys = m.cats.filter(c => c.hollow).map(c => c.key);
+    return keys.length ? ['in', ['get', m.catKey], ['literal', keys]] : null;
+  }
+  function dotColor(mode) {
+    const hollow = hollowMatch(mode);
+    return hollow ? ['case', hollow, 'rgba(0,0,0,0)', paintColorForMode(mode)] : paintColorForMode(mode);
+  }
+  function dotStrokeWidth(mode) {
+    const hollow = hollowMatch(mode);
+    return hollow ? ['case', hollow, 2, 1.2] : 1.2;
+  }
+
   function stationPaint() {
     return {
       'circle-radius': [
@@ -553,9 +573,9 @@
         10, 7,
         14, 9,
       ],
-      'circle-color': paintColorForMode(activeMode),
+      'circle-color': dotColor(activeMode),
       'circle-stroke-color': dotStrokeColor(),
-      'circle-stroke-width': 1.2,
+      'circle-stroke-width': dotStrokeWidth(activeMode),
       'circle-opacity': 0.95,
     };
   }
@@ -634,11 +654,13 @@
 
   function refreshDotColors() {
     if (!map || !map.getLayer('stations-layer')) { renderLegend(); return; }
-    const color = paintColorForMode(activeMode);
+    const color = dotColor(activeMode);
     const stroke = dotStrokeColor();
+    const width = dotStrokeWidth(activeMode);
     for (const lid of ['stations-layer', 'spider-layer']) {
       map.setPaintProperty(lid, 'circle-color', color);
       map.setPaintProperty(lid, 'circle-stroke-color', stroke);
+      map.setPaintProperty(lid, 'circle-stroke-width', width);
     }
     refreshLabelPaint();
     refreshTribalPaint();
@@ -1744,8 +1766,8 @@
       row.dataset.key = r.key;
       const sw = document.createElement('span');
       sw.className = 'mco-legend-swatch';
-      sw.dataset.shape = 'circle';   // the map mark is a dot
-      sw.style.setProperty('--swatch', r.color);
+      sw.dataset.shape = r.hollow ? 'hollow' : 'circle';   // the map mark is a dot
+      sw.style.setProperty('--swatch', r.hollow ? dotStrokeColor() : r.color);
       sw.setAttribute('aria-hidden', 'true');
       const lb = document.createElement('span');
       lb.className = 'mco-legend-label';
