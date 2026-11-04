@@ -41,7 +41,7 @@ def main() -> None:
             timezone_id="America/Denver",
         )
         # Suppress the first-visit help dialog, which would otherwise cover
-        # the map (app.js: 'mco-maint-seen-intro').
+        # the map (app.js: initInfoModal's intro key 'mco-maint-seen-intro').
         ctx.add_init_script(
             "try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch (e) {}"
         )
@@ -54,13 +54,14 @@ def main() -> None:
         print(f"Loading {URL}?{QUERY}…")
         page.goto(f"{URL}?{QUERY}", wait_until="networkidle", timeout=60_000)
 
-        # loadAll() stamps "loaded HH:MM MT" only after both API reads have
-        # landed and the station layer is built; the banner means the
+        # loadAll() stamps "Updated 2:45 PM MST" (MCO.formatUpdatedMT) only
+        # after both API reads have landed and the station layer is built
+        # (it reads "loading…" until then); the banner means the
         # maintenance feed failed, and a card of grey dots is worse than
         # yesterday's card.
         # A locator, not wait_for_function: a string predicate is eval'd
         # in-page and the CSP has no 'unsafe-eval'.
-        page.locator("#refresh-stamp", has_text=re.compile(r"^loaded")).wait_for(timeout=60_000)
+        page.locator("#refresh-stamp", has_text=re.compile(r"^Updated ")).wait_for(timeout=60_000)
         if page.locator("#data-banner").is_visible():
             raise RuntimeError("Maintenance feed unavailable; not overwriting the card.")
 
