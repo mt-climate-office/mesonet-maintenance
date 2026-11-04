@@ -12,25 +12,38 @@
    Render evidence: `ready` proves the data arrived and was handed to the map
    (the sr-only twin is built from the same features as the GeoJSON source),
    and the "station dots paint" probe proves the map actually DREW them: it
-   counts canvas pixels in the overdue/visited colors. A CSP-blocked MapLibre
+   counts canvas pixels in the visited/AgriMet colors. A CSP-blocked MapLibre
    worker leaves the basemap up with nothing on it, and only that probe sees
    it. The "photos load" probe counts responses from the AirTable attachment
    host after opening a station with photos — a blocked CSS background-image
-   is an empty box, not a console error. */
+   is an empty box, not a console error.
+
+   Station IDs here are real: aceashla (Ashland, a HydroMet station with
+   visit photos) and aceabsar (Absarokee, a HydroMet station colocated with
+   the AgriMet wsrabsaw), both from mesonet2's /stations/ list. */
 import { load } from '../mco-web-style/tools/verify/lib.mjs';
 
 // Serialized into the page by Playwright: no closures over module scope.
 const dataReady = () => document.querySelectorAll('#sr-station-table tbody tr').length > 100;
 
-// Compliance-mode dot colors (app.js MODES): visited and overdue.
-const DOT_RGB = [[0x2a, 0x8a, 0x86], [0xb8, 0x42, 0x1b]];
+// An open station sheet: the kit sheet, not closed, titled.
+const sheetOpen = () => {
+  const s = document.getElementById('station-sheet');
+  return !!s && !s.hidden && s.dataset.state !== 'closed';
+};
 
-// First pixel (in page coordinates) in a dot color, or null.
+// Compliance-mode dot colors (app.js ROLE_COLORS, the same in every theme):
+// visited and AgriMet as-needed, the two categories the live network always
+// has many of (overdue can be zero).
+const DOT_RGB = [[0x2a, 0x8a, 0x86], [0x7a, 0x8b, 0xa6]];
+async function dotColors() { return DOT_RGB; }
+
+// First pixel (in page coordinates) in the visited color, or null.
 async function findDot(page) {
   const { PNG } = await load('pngjs');
+  const [R, G, B] = (await dotColors(page))[0];
   const box = await page.locator('#map').boundingBox();
   const png = PNG.sync.read(await page.screenshot({ clip: box }));
-  const [R, G, B] = DOT_RGB[0];
   for (let y = 60; y < png.height - 60; y += 2) for (let x = 340; x < png.width - 80; x += 2) {
     const i = (y * png.width + x) * 4;
     if (Math.abs(png.data[i] - R) + Math.abs(png.data[i + 1] - G) + Math.abs(png.data[i + 2] - B) < 12) {
@@ -42,12 +55,13 @@ async function findDot(page) {
 
 async function dotPixels(page) {
   const { PNG } = await load('pngjs');
+  const colors = await dotColors(page);
   const box = await page.locator('#map').boundingBox();
   const png = PNG.sync.read(await page.screenshot({ clip: box }));
   let n = 0;
   for (let i = 0; i < png.data.length; i += 4) {
     const r = png.data[i], g = png.data[i + 1], b = png.data[i + 2];
-    if (DOT_RGB.some(([R, G, B]) => Math.abs(r - R) + Math.abs(g - G) + Math.abs(b - B) < 24)) n++;
+    if (colors.some(([R, G, B]) => Math.abs(r - R) + Math.abs(g - G) + Math.abs(b - B) < 24)) n++;
   }
   return n;
 }
@@ -64,9 +78,28 @@ export default {
     { name: 'legend-off', query: '?cat-compliance=visited+new&legend=open', ready: dataReady },
     // Every category hidden: the .mco-empty callout over the map.
     { name: 'empty-state', query: '?cat-compliance=', ready: () => document.querySelectorAll('#sr-station-table tbody tr').length > 100 && !document.getElementById('empty-state').hidden },
-    // A station popup open (visit history, pills, photos, links): it only
+    // A station sheet open (visit history, pills, photos, links): it only
     // exists after a click, so a load-only scan never audits it.
-    { name: 'station-popup', query: '?station=aceashla&lng=-106.41&lat=45.6&zoom=9', ready: () => !!document.querySelector('.maplibregl-popup .visit-photo-thumb, #station-sheet:not([hidden]) .visit-photo-thumb') },
+    { name: 'station-sheet', query: '?station=aceashla&lng=-106.14&lat=45.57&zoom=9', ready: () => !!document.querySelector('#station-sheet:not([hidden]) .visit-photo-thumb') },
+    // The plain ?station= deep link (no camera): flies in and opens the
+    // sheet, end-docked at 1440 and a bottom sheet at 390. Absarokee is a
+    // colocated site, so its sheet carries "Also at this site".
+    { name: 'deep-link', query: '?station=aceabsar', ready: () => {
+      const s = document.getElementById('station-sheet');
+      return !!s && !s.hidden && s.dataset.state !== 'closed' && /Also at this site/.test(s.textContent);
+    } },
+    // The compact drawer open at 390 (☰ at the right edge opens a right
+    // drawer). ready opens it; above compact there is no drawer to open.
+    { name: 'drawer-open', query: '', ready: () => {
+      if (document.querySelectorAll('#sr-station-table tbody tr').length <= 100) return false;
+      if (!matchMedia('(max-width: 640px)').matches) return true;
+      const d = document.getElementById('nav-drawer');
+      if (!d.classList.contains('is-open')) document.getElementById('btn-rail-menu').click();
+      return d.classList.contains('is-open');
+    } },
+    // A network chip toggled off (AgriMet hidden): Absarokee's pair resolves
+    // to a plain dot and the chip reads unpressed.
+    { name: 'chip-off', query: '?net=hydromet', ready: () => document.querySelectorAll('#sr-station-table tbody tr').length > 100 && document.querySelector('#subnet-filters [data-network="AgriMet"]')?.getAttribute('aria-pressed') === 'false' },
   ],
   exemptTargets: '',
   allowProblems: [],
@@ -221,15 +254,15 @@ export default {
       await page.waitForTimeout(300);
       const opts = await page.locator('#search-dropdown [role="option"]:not([aria-disabled])').count();
       await page.keyboard.press('Enter');
-      const opened = await page.waitForFunction(() => /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), null, { timeout: 15000 }).then(() => true, () => false);
-      check(`search lists matches (${opts}) and Enter opens that station`, opts > 0 && opened);
+      const opened = await page.waitForFunction(() => /Ashland/.test(document.getElementById('station-sheet-title').textContent) && !document.getElementById('station-sheet').hidden, null, { timeout: 15000 }).then(() => true, () => false);
+      check(`search lists matches (${opts}) and Enter opens that station's sheet`, opts > 0 && opened);
       await close();
     }
     // Compact: a station opens the bottom sheet (peek), the grip takes it to
     // full (modal: <main> inert), the lightbox still works from it, and Esc
     // closes it and drops ?station=.
     {
-      const { page, close } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      const { page, close } = await open('?station=aceashla&lng=-106.14&lat=45.57&zoom=9', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
       const peek = await page.waitForSelector('#station-sheet[data-state="peek"]', { timeout: 15000 }).then(() => true, () => false);
       const noPopup = await page.locator('.maplibregl-popup').count() === 0;
       const title = await page.evaluate(() => [document.getElementById('station-sheet-title').textContent, document.activeElement?.id]);
@@ -265,29 +298,30 @@ export default {
       await page.locator('#search-input').fill('ashla');
       await page.waitForTimeout(300);
       await page.keyboard.press('Enter');
-      await page.waitForSelector('.maplibregl-popup', { timeout: 15000 });
+      await page.waitForFunction(sheetOpen, null, { timeout: 15000 });
       await page.waitForTimeout(500);
-      const a = await page.evaluate(() => ({ len: history.length, q: location.search }));
+      const a = await page.evaluate(() => ({ len: history.length, q: location.search, popups: document.querySelectorAll('.maplibregl-popup').length }));
       await page.goBack();
       await page.waitForTimeout(800);
-      const b = await page.evaluate(() => ({ popup: !!document.querySelector('.maplibregl-popup'), q: location.search }));
+      const b = await page.evaluate(() => ({ popup: !document.getElementById('station-sheet').hidden && document.getElementById('station-sheet').dataset.state !== 'closed', q: location.search }));
       await page.goForward();
-      await page.waitForTimeout(800);
-      const c = await page.evaluate(() => ({ popup: /Ashland/.test(document.querySelector('.maplibregl-popup')?.textContent || ''), q: location.search }));
+      await page.waitForFunction(sheetOpen, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      const c = await page.evaluate((t) => ({ popup: /Ashland/.test(document.getElementById('station-sheet-title').textContent) && document.getElementById('station-sheet').dataset.state !== 'closed', q: location.search }));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(800);
-      const d = await page.evaluate(() => ({ popup: !!document.querySelector('.maplibregl-popup'), q: location.search }));
-      check('station open pushes one entry; Back closes, Forward reopens, Esc steps back',
-        a.len === len0 + 1 && /station=aceashla/.test(a.q) && !b.popup && !/station=/.test(b.q) && c.popup && /station=aceashla/.test(c.q) && !d.popup && !/station=/.test(d.q),
+      const d = await page.evaluate(() => ({ popup: document.getElementById('station-sheet').dataset.state !== 'closed', q: location.search }));
+      check('1440: station opens the end-docked sheet (no popup) and pushes one entry; Back closes, Forward reopens, Esc steps back',
+        a.popups === 0 && a.len === len0 + 1 && /station=aceashla/.test(a.q) && !b.popup && !/station=/.test(b.q) && c.popup && /station=aceashla/.test(c.q) && !d.popup && !/station=/.test(d.q),
         JSON.stringify({ len0, a, b, c, d }));
       await close();
     }
-    // Deep link opens the popup, and its visit photos actually load.
+    // Deep link opens the sheet, and its visit photos actually load.
     {
-      const { page, close, problems } = await open('?station=aceashla&lng=-106.41&lat=45.6&zoom=9', { ready: dataReady, settleMs: 500 });
-      await page.waitForSelector('.maplibregl-popup .visit-photo-thumb', { timeout: 15000 }).catch(() => {});
-      const thumbs = await page.locator('.maplibregl-popup .visit-photo-thumb').count();
-      check(`?station= deep link opens a popup with photo thumbs (${thumbs})`, thumbs > 0);
+      const { page, close, problems } = await open('?station=aceashla&lng=-106.14&lat=45.57&zoom=9', { ready: dataReady, settleMs: 500 });
+      await page.waitForSelector('#station-sheet .visit-photo-thumb', { timeout: 15000 }).catch(() => {});
+      const thumbs = await page.locator('#station-sheet .visit-photo-thumb').count();
+      check(`?station= deep link opens the sheet with photo thumbs (${thumbs})`, thumbs > 0);
       // Background images start loading as the thumbs render; give them time.
       // Resource Timing lists every fetched image, CSS backgrounds included; a
       // CSP-blocked one never gets an entry (and shows up in problems()).
@@ -296,10 +330,10 @@ export default {
       let photos = 0;
       for (let i = 0; i < 40 && !(photos = await photosLoaded()); i++) await page.waitForTimeout(250);
       // Reading the computed style proves the url() survived intact.
-      const bg = await page.locator('.maplibregl-popup .visit-photo-thumb').first()
+      const bg = await page.locator('#station-sheet .visit-photo-thumb').first()
         .evaluate((el) => getComputedStyle(el).backgroundImage).catch(() => '');
       check(`visit photos load from *.airtableusercontent.com (${photos} responses)`, photos > 0 && /airtableusercontent/.test(bg), bg.slice(0, 80));
-      await page.locator('.maplibregl-popup .visit-photo-thumb').first().click();
+      await page.locator('#station-sheet .visit-photo-thumb').first().click();
       const lb = await page.waitForFunction(() => {
         const i = document.getElementById('lightbox-img');
         return document.getElementById('lightbox').open && i.complete && i.naturalWidth > 0;
@@ -307,7 +341,112 @@ export default {
       check('thumb opens the lightbox and the full photo loads', lb);
       check('?station= re-emits in the URL', /station=aceashla/.test(await page.evaluate(() => location.search)));
       const probs = await problems();
-      check('no console / CSP problems with a popup + lightbox open', probs.length === 0, probs.slice(0, 3).join(' | '));
+      check('no console / CSP problems with a sheet + lightbox open', probs.length === 0, probs.slice(0, 3).join(' | '));
+      await close();
+    }
+    // Kit 0.21.0 conformance. ?station= (no camera) opens the sheet at 1440
+    // (end-docked) and at 390 (bottom sheet), never an anchored popup. Once
+    // closed, a manual Refresh must not re-open it (_initStationConsumed).
+    for (const vp of [{ name: '1440', width: 1440, height: 900 }, { name: '390', width: 390, height: 844, touch: true }]) {
+      const { page, close } = await open('?station=aceabsar', { ready: dataReady, viewport: vp });
+      const opened = await page.waitForFunction(sheetOpen, null, { timeout: 20000 }).then(() => true, () => false);
+      const st = await page.evaluate(() => ({
+        title: document.getElementById('station-sheet-title').textContent,
+        popups: document.querySelectorAll('.maplibregl-popup').length,
+        also: /Also at this site/.test(document.getElementById('station-sheet').textContent),
+        right: Math.round(document.getElementById('station-sheet').getBoundingClientRect().right),
+        bottom: Math.round(document.getElementById('station-sheet').getBoundingClientRect().bottom),
+        q: location.search,
+      }));
+      check(`${vp.name}: ?station=aceabsar opens the sheet (Absarokee, "Also at this site", no popup)`,
+        opened && st.title === 'Absarokee' && st.popups === 0 && st.also && /station=aceabsar/.test(st.q), JSON.stringify(st));
+      await page.click('#station-sheet [data-close-sheet]');
+      await page.waitForTimeout(600);
+      const closed = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search }));
+      // Refresh lives in the drawer on a phone; the click goes to the button either way.
+      await page.evaluate(() => document.getElementById('btn-refresh').click());
+      await page.waitForFunction(() => /^Updated /.test(document.getElementById('refresh-stamp').textContent), null, { timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(4000);
+      const after = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search, stamp: document.getElementById('refresh-stamp').textContent }));
+      check(`${vp.name}: closing the deep-linked sheet drops ?station=, and Refresh does not re-open it`,
+        closed.st === 'closed' && !/station=/.test(closed.q) && after.st === 'closed' && !/station=/.test(after.q) && /^Updated .* M[SD]T$/.test(after.stamp),
+        JSON.stringify({ closed, after }));
+      await close();
+    }
+    // 390: the one-row phone bar (badge left, mode select, search, ☰ right),
+    // the right drawer with the drawer contract, Back closing a sheet opened
+    // from search, and the hot control mirroring the drawer's mode control.
+    {
+      const vp = { name: '390', width: 390, height: 844, touch: true };
+      const { page, close } = await open('', { ready: dataReady, viewport: vp });
+      const bar = await page.evaluate(() => {
+        const r = (id) => document.getElementById(id).getBoundingClientRect();
+        const nav = document.getElementById('navbar').getBoundingClientRect();
+        const logo = document.querySelector('#navbar .logo-img').getBoundingClientRect();
+        return { navH: Math.round(nav.height), logoL: Math.round(logo.left), logoW: Math.round(logo.width),
+          menuR: Math.round(r('btn-rail-menu').right), selL: Math.round(r('rail-mode-select').left), searchL: Math.round(r('btn-rail-search').left),
+          menuL: Math.round(r('btn-rail-menu').left), vw: innerWidth,
+          heights: ['btn-rail-menu', 'rail-mode-select', 'btn-rail-search'].map((id) => Math.round(r(id).height)) };
+      });
+      check('390: one-row bar <= 64px: badge at the left edge, mode select, search, ☰ at the right edge, all 40px',
+        bar.navH <= 64 && bar.logoW > 0 && bar.logoL < 24 && bar.logoL < bar.selL && bar.selL < bar.searchL && bar.searchL < bar.menuL && bar.menuR > bar.vw - 24 && bar.heights.every((h) => h === 40),
+        JSON.stringify(bar));
+      await page.click('#btn-rail-menu');
+      await page.waitForTimeout(400);
+      const o = await page.evaluate(() => {
+        const d = document.getElementById('nav-drawer').getBoundingClientRect();
+        return { open: document.getElementById('nav-drawer').classList.contains('is-open'), inDrawer: document.getElementById('nav-drawer').contains(document.activeElement),
+          mainInert: document.getElementById('main').inert, right: Math.round(d.right), left: Math.round(d.left), vw: innerWidth,
+          stamp: document.querySelector('#nav-drawer .refresh-status')?.offsetParent !== null };
+      });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const c = await page.evaluate(() => ({ focus: document.activeElement?.id, mainInert: document.getElementById('main').inert, open: document.getElementById('nav-drawer').classList.contains('is-open') }));
+      check('390: ☰ opens a right drawer (focus in, <main> inert, stamp shown); Esc closes it and returns focus to ☰',
+        o.open && o.inDrawer && o.mainInert && o.right >= o.vw - 1 && o.left > 0 && o.stamp && !c.open && c.focus === 'btn-rail-menu' && !c.mainInert,
+        JSON.stringify({ o, c }));
+      // The hot control: the bar's select sets the mode, and the drawer's copy follows.
+      await page.selectOption('#rail-mode-select', 'timesince');
+      await page.waitForTimeout(400);
+      const m = await page.evaluate(() => ({ q: location.search, t: document.getElementById('legend-title').textContent, drawer: document.getElementById('mode-select').value }));
+      check('390: the bar\'s mode select sets the mode; the drawer copy, legend and ?mode= follow',
+        /mode=timesince/.test(m.q) && /Since last/.test(m.t) && m.drawer === 'timesince', JSON.stringify(m));
+      // Search from the bar: the button opens the drawer on the field; a pick
+      // opens the sheet with one pushed entry, and Back closes it.
+      const len0 = await page.evaluate(() => history.length);
+      await page.click('#btn-rail-search');
+      await page.waitForTimeout(400);
+      const sf = await page.evaluate(() => document.activeElement?.id);
+      await page.keyboard.type('absar');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Enter');
+      const op = await page.waitForFunction(sheetOpen, null, { timeout: 20000 }).then(() => true, () => false);
+      await page.waitForTimeout(400);
+      const a = await page.evaluate(() => ({ len: history.length, q: location.search, drawer: document.getElementById('nav-drawer').classList.contains('is-open') }));
+      await page.goBack();
+      await page.waitForTimeout(900);
+      const b = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search }));
+      check('390: search button -> drawer on the field; a pick opens the sheet (one push), Back closes it',
+        sf === 'search-input' && op && !a.drawer && a.len === len0 + 1 && /station=aceabsar/.test(a.q) && b.st === 'closed' && !/station=/.test(b.q),
+        JSON.stringify({ sf, op, a, b, len0 }));
+      await close();
+    }
+    // A network chip toggle (.mco-chip[aria-pressed]): AgriMet off drops its
+    // stations from the map and the table, resolves Absarokee's colocated
+    // pair to a plain dot, and writes ?net=.
+    {
+      const { page, close } = await open('', { ready: dataReady });
+      const before = await page.evaluate(() => ({ rows: document.querySelectorAll('#sr-station-table tbody tr').length,
+        site: [...document.querySelectorAll('#sr-station-table tbody tr')].find((tr) => /aceabsar/.test(tr.textContent))?.textContent || '' }));
+      await page.click('#subnet-filters [data-network="AgriMet"]');
+      await page.waitForTimeout(600);
+      const after = await page.evaluate(() => ({ rows: document.querySelectorAll('#sr-station-table tbody tr').length,
+        pressed: document.querySelector('#subnet-filters [data-network="AgriMet"]').getAttribute('aria-pressed'),
+        cls: document.querySelector('#subnet-filters [data-network="AgriMet"]').className, q: location.search,
+        site: [...document.querySelectorAll('#sr-station-table tbody tr')].find((tr) => /aceabsar/.test(tr.textContent))?.textContent || '' }));
+      check('AgriMet chip off: aria-pressed=false, fewer rows, ?net=hydromet, Absarokee no longer a 2-station site',
+        /mco-chip/.test(after.cls) && after.pressed === 'false' && after.rows < before.rows && after.rows > 100 && /net=hydromet/.test(after.q) && /2 stations at this site/.test(before.site) && !/stations at this site/.test(after.site),
+        JSON.stringify({ before: { rows: before.rows, site: before.site }, after }));
       await close();
     }
   },

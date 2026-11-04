@@ -21,8 +21,8 @@ Other features:
 - **HydroMet / AgriMet** sub-network chips with live counts.
 - **Search box** with a themed dropdown, keyboard navigation (`↑` `↓` `Enter`), and a `/` global shortcut (`?kbd=off` disables it).
 - **Interactive legend** — click a row to hide that category; double-click (or <kbd>Shift</kbd>+<kbd>Enter</kbd>) to isolate it.
-- **Co-located sites** show a count badge and fan out on hover or tap; click a foot for that station.
-- **Station popup** with the full visit history — dates, crew, trip types, tasks, sensors added/removed, and visit photos in a gallery + lightbox — plus a dashboard link.
+- **Co-located sites** show a count badge and fan out on hover or tap; click a foot for that station (the kit's `MCO.map.colocation`). The station panel lists the others under "Also at this site".
+- **Station panel** (the kit's sheet: docked at the side on desktop, a bottom sheet on a phone) with the full visit history — dates, crew, trip types, tasks, sensors added/removed, and visit photos in a gallery + lightbox — plus a dashboard link.
 - **Toggleable station-ID labels** with collision dodging.
 - **Tribal lands** and **Montana outline** overlays; hillshade relief.
 - **Light / dark / high-contrast** themes on neutral [CARTO](https://carto.com/basemaps) basemaps; honors `prefers-reduced-motion` and `prefers-color-scheme`.
@@ -44,7 +44,7 @@ Every piece of UI state is mirrored to the URL. Parameters appear only when they
 | `theme` | `light` \| `dark` \| `high-contrast` | Emitted only when it differs from the OS preference |
 | `kbd` | `off` | Disables the `/` search shortcut |
 | `lng`, `lat`, `zoom` | floats | Camera, emitted as a set when not at the Montana extent |
-| `station` | station id (e.g. `aceabsar`) | Opens that station's popup on load |
+| `station` | station id (e.g. `aceabsar`) | Opens that station's panel on load; Back closes it |
 
 Precedence per setting: URL param > `localStorage` > built-in default. Enum values are matched case-insensitively; list params accept `+`, spaces, or commas.
 
@@ -84,7 +84,7 @@ distribution. **Pushing `main` is a production deploy.**
 `assets/og-card.png` back to `main`** — always pull/rebase before pushing, or you race it.
 
 `scripts/generate_preview.py` screenshots the canonical URL at 2400×1260 (1800×945 at 4/3×, wide enough that the fitted zoom clears the z6 label threshold) with
-`?net=hydromet&labels=on&theme=light`, after the `#refresh-stamp` reads "loaded …" (both API reads landed). It
+`?net=hydromet&labels=on&theme=light`, after the `#refresh-stamp` reads "Updated …" (both API reads landed). It
 refuses to overwrite the card when `#data-banner` shows (maintenance feed down). Those ids,
 the `net`/`labels`/`theme` parameters and the `mco-maint-seen-intro` key it pre-seeds to keep the help
 dialog closed are a contract — changing them silently breaks the social preview. Run it

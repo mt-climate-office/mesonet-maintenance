@@ -7,7 +7,7 @@ the API and the CDN-pinned libraries in `index.html`.
 ## House style
 
 This app consumes mco-web-style (pinned + SRI in `index.html`; currently
-**v0.16.2** — check the tag in that file rather than trusting this line). Design
+**v0.21.0** — check the tag in that file rather than trusting this line). Design
 tokens, a11y mandates, and interaction conventions: see HOUSE-STYLE.md in
 https://github.com/mt-climate-office/mco-web-style — tokens only (no raw hexes),
 `--accent` is fill-only, `aria-pressed` drives toggle styling, canvas data needs
@@ -16,9 +16,15 @@ bump the pinned version here; never patch a local copy.
 
 App-local by deliberate kit decision (do NOT extract): the compliance model
 (`MODES` in `app.js` — which trip types qualify, exemptions, time bins), the
-colocation/spider fan-out, the visit-history popup with photo gallery + lightbox,
-and the trip-type chips. Category colors in `MODES` are the one place raw hexes
-are allowed: they are data-vis ramps, recorded with their measured contrast.
+visit-history content of the station sheet with its photo gallery + lightbox,
+and the trip-type chips, and the category colors (`ROLE_COLORS` in `app.js`,
+the one place raw hexes for them are allowed: data-vis colors, kept as they
+were by Kyle's 2026-11-04 ruling). Since kit 0.21.0 the kit owns the rest: the
+colocation count badge and spider (`MCO.map.colocation`), the station sheet
+at every width (`MCO.initSheet`; no anchored popup), the deep-link fly
+(`MCO.map.flyToAndOpen`), the one-row phone bar (`data-rail="compact"`), the
+stamp (`MCO.formatUpdatedMT`), the first-visit intro (`initInfoModal`'s
+`intro`).
 
 ## Data
 
@@ -48,7 +54,7 @@ A nightly workflow (`.github/workflows/preview.yml`, 08:00 UTC) **commits
 `assets/og-card.png` to `main`**, so pull/rebase before pushing.
 `scripts/generate_preview.py` screenshots the canonical URL with
 `?net=hydromet&labels=on&theme=light`
-and depends on `#refresh-stamp` ("loaded …"), `#data-banner` (an `MCO.notice`
+and depends on `#refresh-stamp` ("Updated …", `MCO.formatUpdatedMT`), `#data-banner` (an `MCO.notice`
 whose element app.js gives that id; present only while the feed is down), and the
 `mco-maint-seen-intro` localStorage key; rename any of them and the card
 silently breaks. Its waits must be locators, not `wait_for_function` strings —
@@ -68,7 +74,7 @@ kit checkout beside this repo, driven by the committed `verify.config.mjs`:
 
 They run Chromium AND WebKit against the live API. The config's probes prove
 the map draws its data (canvas pixels in the dot colors, before and after a
-theme flip) and that a station popup's AirTable photos load. `ready` must be
+theme flip) and that a station sheet's AirTable photos load. `ready` must be
 a **function**, not a string: a string is `eval`'d in-page and the CSP has no
 `'unsafe-eval'`. (The older untracked `consumer-verify.mjs` + `fixtures/`
 harness still works for offline runs.)
