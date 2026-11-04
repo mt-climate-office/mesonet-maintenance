@@ -126,10 +126,9 @@
 
   <style>
     /* ── Data colors ───────────────────────────────────────────────────────
-       The category colors are the kit's map category sets
-       (MCO.palette.categorySet: maintenance-compliance, maintenance-age,
-       maintenance-trip, kit 0.21.0), per theme, read by app.js. No raw hex
-       for them lives here. */
+       The category colors are this map's own, in app.js's role registry
+       (ROLE_COLORS), read per theme. The station-sheet pill draws its dot
+       in the same color. */
 
     /* ── Navbar (app-specific remainder) ───────────────────────────────────
        The kit owns .mco-navbar and its gradient rule, the logo/divider/brand

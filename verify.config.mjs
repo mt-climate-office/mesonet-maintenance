@@ -32,26 +32,11 @@ const sheetOpen = () => {
   return !!s && !s.hidden && s.dataset.state !== 'closed';
 };
 
-// Compliance-mode dot colors: the kit's maintenance-compliance set
-// (MCO.palette.categorySet, kit 0.21.0), visited and AgriMet as-needed —
-// the two categories the live network always has many of (overdue can be
-// zero). Dark and high contrast share the dark values.
-const DOT_RGB = {
-  dark:  [[0xc0, 0xec, 0xb2], [0xb3, 0xc1, 0xd4]],
-  light: [[0x03, 0x37, 0x22], [0x4a, 0x48, 0x5b]],
-};
-const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-async function dotColors(page) {
-  // Read from the kit at run time, so a kit set change can't strand the probe.
-  const rgb = await page.evaluate(() => {
-    const t = document.documentElement.dataset.theme;
-    const set = MCO.palette.categorySet('maintenance-compliance', t);
-    return ['visited', 'as_needed'].map((k) => set.find((r) => r.key === k).color);
-  }).catch(() => null);
-  if (rgb) return rgb.map(hex);
-  const t = await page.evaluate(() => document.documentElement.dataset.theme);
-  return DOT_RGB[t === 'light' ? 'light' : 'dark'];
-}
+// Compliance-mode dot colors (app.js ROLE_COLORS, the same in every theme):
+// visited and AgriMet as-needed, the two categories the live network always
+// has many of (overdue can be zero).
+const DOT_RGB = [[0x2a, 0x8a, 0x86], [0x7a, 0x8b, 0xa6]];
+async function dotColors() { return DOT_RGB; }
 
 // First pixel (in page coordinates) in the visited color, or null.
 async function findDot(page) {

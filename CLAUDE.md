@@ -17,13 +17,14 @@ bump the pinned version here; never patch a local copy.
 App-local by deliberate kit decision (do NOT extract): the compliance model
 (`MODES` in `app.js` — which trip types qualify, exemptions, time bins), the
 visit-history content of the station sheet with its photo gallery + lightbox,
-and the trip-type chips. Since kit 0.21.0 the kit owns the rest: the
+and the trip-type chips, and the category colors (`ROLE_COLORS` in `app.js`,
+the one place raw hexes for them are allowed: data-vis colors, kept as they
+were by Kyle's 2026-11-04 ruling). Since kit 0.21.0 the kit owns the rest: the
 colocation count badge and spider (`MCO.map.colocation`), the station sheet
 at every width (`MCO.initSheet`; no anchored popup), the deep-link fly
 (`MCO.map.flyToAndOpen`), the one-row phone bar (`data-rail="compact"`), the
 stamp (`MCO.formatUpdatedMT`), the first-visit intro (`initInfoModal`'s
-`intro`) and the category colors (`MCO.palette.categorySet`, the
-`maintenance-*` sets). No raw hex for a category lives in this repo.
+`intro`).
 
 ## Data
 

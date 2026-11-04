@@ -37,64 +37,90 @@
   const TRIP_PRECEDENCE = ['Maintenance', 'Repair', 'Ground Game', 'Structure Install', 'Tech Install'];
 
   // Mode configs. Each mode = a catKey (the GeoJSON property the legend/filter/
-  // paint key on), a legend title, the kit category set its colors and labels
-  // come from, and ordered category keys. `hollow` categories (no data) are
-  // drawn unfilled and are not in the kit set.
+  // paint key on), a legend title, and ordered categories (key, label). The
+  // colors come from ROLE_COLORS below. `hollow` categories (no data) are
+  // drawn unfilled and carry no color.
   const MODES = {
     compliance: {
       catKey: 'complianceState',
       legendTitle: 'HydroMet requirement (this year)',
-      set: 'maintenance-compliance',
       cats: [
-        { key: 'visited' },
-        { key: 'overdue' },
-        { key: 'new' },
+        { key: 'visited',   label: 'Visited this year' },
+        { key: 'overdue',   label: 'Overdue' },
+        { key: 'new',       label: 'New this year (exempt)' },
         // A compliance category (AgriMet carries no annual requirement), not
-        // a network marker: HOUSE-STYLE §6, decision 5 of the 0.21.0 audit.
-        { key: 'as_needed' },
+        // a network marker.
+        { key: 'as_needed', label: 'AgriMet (as-needed)' },
         // 'nodata' only occurs on a total fetch failure (every station at once,
         // covered by the banner). Kept for paint/filter but hidden from the legend.
-        { key: 'nodata', label: 'No data', hidden: true, hollow: true },
+        { key: 'nodata',    label: 'No data', hidden: true, hollow: true },
       ],
     },
     timesince: {
       catKey: 'timeBinKey',
       legendTitle: 'Since last Maintenance',
-      // The kit's age ramp (lightness-monotonic, so it survives grayscale).
-      set: 'maintenance-age',
       cats: [
-        { key: '0' }, { key: '1' }, { key: '2' }, { key: '3' }, { key: '4' },
+        { key: '0',    label: '< 1 month' },
+        { key: '1',    label: '1–3 months' },
+        { key: '2',    label: '3–6 months' },
+        { key: '3',    label: '6–12 months' },
+        { key: '4',    label: '> 1 year' },
         { key: 'null', label: 'Never / no data', hollow: true },
       ],
     },
     triptype: {
       catKey: 'tripTypeKey',
       legendTitle: 'Most recent trip type',
-      set: 'maintenance-trip',
-      // Reverse of the natural work order (Ground Game → Structure → Tech →
-      // Repair → Maintenance), so Maintenance sits on top; the kit set's order.
       cats: [
-        { key: 'Maintenance' }, { key: 'Repair' }, { key: 'Tech Install' },
-        { key: 'Structure Install' }, { key: 'Ground Game' }, { key: 'Other' },
+        // Reverse of the natural work order (Ground Game → Structure → Tech →
+        // Repair → Maintenance), so Maintenance sits on top.
+        { key: 'Maintenance',       label: 'Maintenance' },
+        { key: 'Repair',            label: 'Repair' },
+        { key: 'Tech Install',      label: 'Tech Install' },
+        { key: 'Structure Install', label: 'Structure Install' },
+        { key: 'Ground Game',       label: 'Ground Game' },
+        { key: 'Other',             label: 'Other / none' },
       ],
     },
   };
   const MODE_NAMES = Object.keys(MODES);
-  // Category colors and labels: the kit's map category sets (palette 0.21.0,
-  // MCO.palette.categorySet), per theme. Every color clears 3:1 on both
-  // basemaps, the surfaces and the tribal fill, stays clear of the
-  // orange/brown band the tribal fill owns, and stays distinct under CVD
-  // simulation (kit CI). Re-read on every theme change, before the restyle.
+
+  // ── Category colors: this map's one role registry ────────────────────────
+  // Data-encoding colors (HOUSE-STYLE §6), the app's own (Kyle, 2026-11-04:
+  // every app keeps its original category colors, orange/brown included; the
+  // overlap with the tribal fill is accepted). One entry per theme. The
+  // values are deliberately the same in all three: these hues ARE the data,
+  // and shifting them per theme would make two screenshots of the same
+  // network disagree. Their edge contrast is carried by --dot-stroke.
+  // Time since: the kit's roma, option B (Kyle, 2026-10-10):
+  // MCO.palette.sample('roma', 5, {from: .1, to: .9, reverse: true}), newest
+  // (blue) -> oldest (brown). A diverging ramp has no 3:1 span; the kit's
+  // --dot-stroke outline carries the mark edge (14-21:1).
+  const ROMA_5 = MCO.palette.sample('roma', 5, { from: 0.1, to: 0.9, reverse: true });
+  const MAINT_ROLES = {
+    compliance: {
+      visited:   '#2a8a86',   // data color (§6): teal — compliant this year
+      overdue:   '#b8421b',   // data color (§6): red-orange — overdue
+      new:       '#5aaee8',   // data color (§6): blue — installed this year, exempt
+      as_needed: '#7a8ba6',   // data color (§6): slate — AgriMet, as-needed
+    },
+    timesince: { 0: ROMA_5[0], 1: ROMA_5[1], 2: ROMA_5[2], 3: ROMA_5[3], 4: ROMA_5[4] },
+    triptype: {
+      'Maintenance':       '#2a8a86',   // data color (§6)
+      'Repair':            '#b8421b',   // data color (§6)
+      'Tech Install':      '#e0a32e',   // data color (§6)
+      'Structure Install': '#b07fd0',   // data color (§6)
+      'Ground Game':       '#5aaee8',   // data color (§6)
+      'Other':             '#9aa3b3',   // data color (§6)
+    },
+  };
+  const ROLE_COLORS = { dark: MAINT_ROLES, light: MAINT_ROLES, 'high-contrast': MAINT_ROLES };
+  // Copy the current theme's colors onto the mode categories. Run at boot and
+  // on every theme change, before the restyle.
   function applyPalette() {
-    const theme = MCO.getTheme();
-    for (const m of Object.values(MODES)) {
-      const rows = new Map(MCO.palette.categorySet(m.set, theme).map((r) => [r.key, r]));
-      for (const c of m.cats) {
-        if (c.hollow) continue;
-        const r = rows.get(c.key);
-        c.color = r.color;
-        c.label = r.label;
-      }
+    const roles = ROLE_COLORS[MCO.getTheme()] || ROLE_COLORS.dark;
+    for (const [mode, m] of Object.entries(MODES)) {
+      for (const c of m.cats) if (!c.hollow) c.color = roles[mode][c.key];
     }
   }
   applyPalette();
@@ -145,7 +171,8 @@
   // MCO.setTheme caller): the kit's mco:themechange event (0.9.0), not the
   // toggle's onChange. The every-style.load handler in wireMapLoad() re-adds
   // our layers and re-samples the ramp colors for the new theme.
-  // The category colors are per theme: re-read them before the restyle.
+  // The category colors are read from the role registry per theme: re-read
+  // them before the restyle.
   document.addEventListener('mco:themechange', () => {
     applyPalette();
     if (map) map.setStyle(MCO.map.cartoStyleUrl());
@@ -1071,7 +1098,7 @@
       const c = catColor('triptype', t) || catColor('triptype', 'Other');
       // The category color marks the border and a light tint; the TEXT stays
       // --text-primary (CSS). Colored text failed 1.4.3 on the sheet surface.
-      // c is a kit category-set hex (#rrggbb), so the alpha suffix is valid.
+      // c is a ROLE_COLORS hex (#rrggbb), so the alpha suffix is valid.
       const chip = el('span', 'trip-chip', t);
       chip.style.borderColor = c;
       chip.style.background = c + '22';
