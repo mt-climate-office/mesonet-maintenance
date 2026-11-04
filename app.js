@@ -1241,10 +1241,9 @@
   // its keyboard twin, focus to the title and back to the opener, and
   // modality only in the full detent on compact. The two dialogs stay live:
   // a thumb in the sheet opens the lightbox over it.
-  // The end-docked sheet sits under the chrome at top: var(--chrome-h). The
-  // kit publishes that only for an .is-sticky bar; this bar is in flow, so
-  // publish its height here, or the navbar covers the sheet's title and
-  // close button. (The landscape rail forces it back to 0 in the kit CSS.)
+  // The bar's height as --chrome-h, which the kit's phone bottom sheet keeps
+  // clear of (its full-detent max-height). The end-docked sheet measures the
+  // bar itself since kit 0.21.1. (The landscape rail forces it back to 0.)
   MCO.metrics.observe('--chrome-h', document.getElementById('navbar'));
   const sheetEl = document.getElementById('station-sheet');
   const sheetTitleEl = document.getElementById('station-sheet-title');
