@@ -192,7 +192,10 @@
     /* ── Legend (bottom-left, collapsible) ────────────────────────────────── */
     /* The panel shell, its header/title/toggle, the caret rotation and the
        animated collapse all come from .mco-panel + MCO.initCollapsible. Only
-       this map's placement and its row contents are app-specific. */
+       this map's placement and its row contents are app-specific. On a phone
+       MCO.initLegendDrawer (kit 1.0.0) moves the panel into a "Legend" group
+       in the ☰ drawer (where the kit's .is-in-drawer resets its placement)
+       and puts a Legend button in this corner. */
     #legend {
       bottom: max(36px, calc(12px + env(safe-area-inset-bottom)));
       left: 12px;
@@ -334,8 +337,9 @@
       .nav-meta { gap: 0.3rem; }   /* kit-override: tighter nav buttons at the 1400 rung, see above */
     }
     /* The rail's mode select is the compact bar's hot control. In the
-       short-landscape rail (a 56px column, MCO.viewport.RAIL_MQ) it can't
-       fit, so it hides there and the drawer's select stays the way in. */
+       short-landscape rail (a 56px column at the right edge,
+       MCO.viewport.RAIL_MQ) a select can't fit, so it hides there and the
+       drawer's select stays the way in (MIGRATING 0.21.2 → 1.0.0, step 3). */
     @media (max-height: 560px) and (orientation: landscape) {
       #rail-mode-select { display: none; }
     }
@@ -358,7 +362,8 @@
      logo badge at the left edge, then the color-mode select (this map's hot
      control), the search button and ☰ at the right edge. Everything in
      .mco-nav-drawer opens as a right drawer from ☰ (MCO.initNavRail). On a
-     landscape phone (~750x342) the same .mco-rail is a 56px left rail.
+     landscape phone (~750x342) the same bar is a 56px rail at the RIGHT edge
+     (kit 1.0.0): badge, ☰, search, with the drawer opening beside it.
      Above compact .mco-rail is display:none and .mco-nav-drawer is
      display:contents, so the desktop bar lays out as one row. -->
 <header id="navbar" class="mco-navbar" data-rail="compact">
@@ -553,7 +558,7 @@
         <li><strong>Time since</strong>: how long since the last Maintenance visit, for every network. An empty (unfilled) dot has never had one.</li>
         <li><strong>Trip type</strong>: the type of the most recent completed visit.</li>
       </ul>
-      <p>The legend names each color.</p>
+      <p>The legend names each color. On a phone it is in the menu (☰); the Legend button on the map opens it there.</p>
     </div>
 
     <div class="info-section">

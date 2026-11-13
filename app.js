@@ -1524,7 +1524,10 @@
     const saved = MCO.lsGet('mco-maint-legend');
     if (saved === 'collapsed' || saved === '1') return true;
     if (saved === 'expanded'  || saved === '0') return false;
-    return MCO.viewport.isCompact();   // no preference: start collapsed on a phone
+    // No preference: open at every width. On a phone the legend is a group
+    // in the ☰ drawer (MCO.initLegendDrawer below), not a panel over the
+    // map, so it no longer starts collapsed there (kit 1.0.0).
+    return false;
   })();
 
   // apply() runs once at init and calls onChange with it. Don't let that first
@@ -1543,6 +1546,13 @@
     },
   });
   _legendInit = false;
+
+  // On a phone (MCO.viewport.isCompact) the legend moves into a "Legend"
+  // group at the end of the ☰ drawer, and a Legend button takes its corner
+  // on the map and opens the drawer at it (kit 1.0.0). Above compact it
+  // floats as before. The panel moves whole: its collapse and toggles go
+  // with it.
+  MCO.initLegendDrawer({ panel: document.getElementById('legend'), rail });
 
   // ── Legend (Plotly-style toggles) ────────────────────────────────────────
   // MCO.initLegendToggles (kit 0.8.0) owns the interaction: click toggles a
