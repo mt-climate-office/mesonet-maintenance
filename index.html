@@ -240,7 +240,10 @@
       text-transform: uppercase; color: var(--text-muted);
       border-bottom: 1px solid var(--border); padding-bottom: 3px;
     }
-    .pop-scroll { max-height: 230px; overflow-y: auto; margin-top: 4px; }
+    /* The visit list flows in the panel body, which scrolls (kit 1.0.0: the
+       panel is full height at every width). Its old 230px inner scroller,
+       from the anchored-popup days, nested a second scroll area inside it. */
+    .pop-scroll { margin-top: 4px; }
     .visit-item { padding: 6px 2px; border-bottom: 1px solid var(--border-glass); font-size: 0.73rem; }
     .visit-item:last-child { border-bottom: 0; }
     .visit-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
