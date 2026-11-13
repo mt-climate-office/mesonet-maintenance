@@ -207,7 +207,7 @@
     }
 
     /* ── Station sheet ─────────────────────────────────────────────────────── */
-    /* The shell (surface, head, grip, close, detents) is the kit's
+    /* The shell (surface, head, close, full-height phone panel) is the kit's
        MCO.initSheet, and the title/subtitle/action bar inside it are
        MCO.map.popupContent's. What follows is this map's visit history.
        The status pill is neutral (--text-primary on the sheet surface, so
@@ -516,15 +516,15 @@
      rebuilt on every repaint) is MCO.srTable's, appended here by app.js. -->
 </main>
 
-<!-- Station detail at every width (MCO.initSheet, kit 0.21.0): end-docked
-     above compact, a bottom sheet on a phone; app.js fills it. Outside
-     <main> so its full detent can make <main> and the navbar inert while
-     the dialogs stay live. -->
+<!-- Station detail at every width (MCO.initSheet; one state since kit
+     1.0.0): end-docked above compact with the map live, full height under
+     the bar on a phone; app.js fills it. Outside <main> so on a phone it can
+     make <main> inert while the bar and the dialogs stay live. The close
+     button is the only close on a touch screen (44px, every width). -->
 <section class="mco-sheet" id="station-sheet" aria-labelledby="station-sheet-title" data-state="closed" hidden>
   <div class="mco-sheet-head">
-    <button type="button" class="mco-sheet-grip" aria-label="Expand details" aria-expanded="false"></button>
     <h2 class="mco-sheet-title" id="station-sheet-title" tabindex="-1">Station</h2>
-    <button type="button" class="modal-close" data-close-sheet aria-label="Close">×</button>
+    <button type="button" class="modal-close" data-close-sheet aria-label="Close station details">×</button>
   </div>
   <div class="mco-sheet-body"></div>
 </section>
