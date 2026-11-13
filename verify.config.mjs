@@ -219,6 +219,8 @@ export default {
       await page.setViewportSize({ width: 1000, height: 800 });
       await page.waitForTimeout(400);
       const vis = await page.evaluate(() => [document.getElementById('mode-seg').hidden, document.getElementById('mode-select').hidden]);
+      // At 1000px the bar folds (kit 0.21.0), so the select is in the closed ☰ drawer.
+      if (!(await page.locator('#mode-select').isVisible())) { await page.click('#btn-rail-menu'); await page.waitForTimeout(400); }
       await page.selectOption('#mode-select', 'triptype');
       await page.waitForTimeout(300);
       const b = await page.evaluate(() => ({ q: location.search, t: document.getElementById('legend-title').textContent, pressed: document.querySelector('#mode-seg [aria-pressed="true"]')?.dataset.value }));
