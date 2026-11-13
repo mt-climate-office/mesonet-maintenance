@@ -106,6 +106,18 @@ export default {
   dialogOpener: '#btn-info',
   shortcuts: [{ key: '/', effect: () => document.activeElement?.id === 'search-input' }],
   probes: async ({ env, open, check }) => {
+    // Inputs first: the page is served (200) and both live API feeds answer
+    // 200 with rows, so a probe below can't pass on an empty or failed load.
+    {
+      const ctx = await env.browser.newContext();
+      const get = async (url) => { const r = await ctx.request.get(url, { timeout: 30000 }).catch(() => null); if (!r) return [0, 0]; const t = await r.text(); let n = t.length; try { const j = JSON.parse(t); n = Array.isArray(j) ? j.length : Object.keys(j).length; } catch {} return [r.status(), n]; };
+      const pg = await get(env.base + 'index.html');
+      const st = await get('https://mesonet2.climate.umt.edu/api/v2/stations/?type=json');
+      const mt = await get('https://mesonet2.climate.umt.edu/api/v2/stations/maintenance/live?type=json');
+      check(`inputs: page ${pg[0]} (${pg[1]} bytes), /stations/ ${st[0]} (${st[1]} rows), /maintenance/live ${mt[0]} (${mt[1]} rows)`,
+        pg[0] === 200 && pg[1] > 10000 && st[0] === 200 && st[1] > 100 && mt[0] === 200 && mt[1] > 0, JSON.stringify({ pg, st, mt }));
+      await ctx.close();
+    }
     // The map draws its data, not just the basemap.
     {
       const { page, close, problems } = await open('', { ready: dataReady, settleMs: 2500 });
@@ -360,6 +372,41 @@ export default {
       check('390: with the panel open the bar\'s search swaps the station; the close button closes it', sf === 'search-input' && swapped && st.st === 'closed' && !st.inert && !/station=/.test(st.q), JSON.stringify({ sf, swapped, st }));
       await close();
     }
+    // Dialogs from inside an open overlay (kit 1.0.0 RC 3): the info dialog
+    // opened from the ☰ drawer at 390 and 844x390 is live with focus inside,
+    // Esc closes it, and focus returns to its opener (?) in the drawer, which
+    // stays open. The lightbox opened from a thumb in the open panel returns
+    // focus to that thumb. The app closes neither overlay first.
+    for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '844x390', width: 844, height: 390, touch: true }]) {
+      const { page, close } = await open('', { ready: dataReady, viewport: vp });
+      await page.click('#btn-rail-menu');
+      await page.waitForTimeout(500);
+      await page.click('#btn-info');
+      await page.waitForTimeout(500);
+      const d = await page.evaluate(() => { const m = document.getElementById('info-modal'); return { open: m.open, modal: m.matches(':modal'), inert: m.inert || !!m.closest('[inert]'), focusIn: m.contains(document.activeElement) }; });
+      // Live: its close button takes a real click.
+      const hit = await page.evaluate(() => { const b = document.querySelector('#info-modal [data-close-modal]').getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!t && !!t.closest('#info-modal'); });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+      const a2 = await page.evaluate(() => ({ open: document.getElementById('info-modal').open, focus: document.activeElement?.id, drawer: document.getElementById('nav-drawer').classList.contains('is-open') }));
+      check(`${vp.name}: info dialog from the open ☰ drawer is live (modal, focus inside, hittable); Esc closes it, focus back on ? in the still-open drawer`,
+        d.open && d.modal && !d.inert && d.focusIn && hit && !a2.open && a2.focus === 'btn-info' && a2.drawer, JSON.stringify({ d, hit, a2 }));
+      await close();
+    }
+    for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '1440', width: 1440, height: 900 }]) {
+      const { page, close } = await open('?station=aceashla&lng=-106.14&lat=45.57&zoom=9', { ready: dataReady, viewport: vp });
+      await page.waitForSelector('#station-sheet .visit-photo-thumb', { timeout: 15000 }).catch(() => {});
+      const thumb = page.locator('#station-sheet .visit-photo-thumb').first();
+      await thumb.click();
+      const lb = await page.waitForFunction(() => document.getElementById('lightbox').open, null, { timeout: 15000 }).then(() => true, () => false);
+      const inLb = await page.evaluate(() => { const l = document.getElementById('lightbox'); return { focusIn: l.contains(document.activeElement), inert: l.inert || !!l.closest('[inert]') }; });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const back = await page.evaluate(() => ({ open: document.getElementById('lightbox').open, onThumb: document.activeElement === document.querySelector('#station-sheet .visit-photo-thumb'), st: document.getElementById('station-sheet').dataset.state }));
+      check(`${vp.name}: lightbox from the open panel is live with focus inside; Esc closes it and returns focus to the thumb, panel still open`,
+        lb && inLb.focusIn && !inLb.inert && !back.open && back.onThumb && back.st === 'full', JSON.stringify({ lb, inLb, back }));
+      await close();
+    }
     // The legend (kit 1.0.0, MCO.initLegendDrawer): at 390 it is a "Legend"
     // group at the end of the ☰ drawer and a Legend button sits in its
     // bottom-left corner on the map; the button opens the drawer with the
@@ -393,6 +440,21 @@ export default {
       check('1440: the legend floats over the map again (no Legend button)', d.floating && d.inMap && d.btnHidden, JSON.stringify(d));
       await close();
     }
+    // Touch tablet (768x1024, legend floating): the legend sits clear above
+    // the 44px two-line attribution; at 1440 with a mouse it keeps its 36px
+    // bottom inset.
+    for (const vp of [{ name: '768x1024 touch', width: 768, height: 1024, touch: true }, { name: '1440 mouse', width: 1440, height: 900 }]) {
+      const { page, close } = await open('?legend=open', { ready: dataReady, viewport: vp, settleMs: 1000 });
+      const g = await page.evaluate(() => {
+        const R = (el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); };
+        const l = R(document.getElementById('legend')), a = R(document.querySelector('#map .maplibregl-ctrl-attrib')), m = R(document.getElementById('map'));
+        const ox = Math.min(l[2], a[2]) - Math.max(l[0], a[0]), oy = Math.min(l[3], a[3]) - Math.max(l[1], a[1]);
+        return { legend: l, attrib: a, overlap: ox > 0 && oy > 0 ? [ox, oy] : null, bottomInset: m[3] - l[3] };
+      });
+      const ok = vp.touch ? !g.overlap : g.bottomInset === 36;
+      check(`${vp.name}: legend ${g.legend.join(',')} vs attribution ${g.attrib.join(',')} — ${vp.touch ? 'no overlap' : 'bottom inset 36px (unchanged)'}`, ok, JSON.stringify(g));
+      await close();
+    }
     // The bar never grows past one row while the sub-network chips arrive
     // from the live API (seconds after load): sample its height every 100ms
     // from 1s after navigation until the chips have been in for 2s (or 12s).
@@ -418,7 +480,8 @@ export default {
         }, 100);
       });
       const page = await ctx.newPage();
-      await page.goto(env.base);
+      const resp = await page.goto(env.base);
+      check(`${vp.width}x${vp.height} sampler: page served (${resp ? resp.status() : 'no response'})`, !!resp && resp.status() === 200);
       const chips = await page.waitForFunction(() => document.querySelectorAll('#subnet-filters .mco-chip').length > 0, null, { timeout: 12000 }).then(() => true, () => false);
       // Keep sampling until a sample lands 2s after the chips (timers can run
       // late under load, so wait on the samples, not the clock).

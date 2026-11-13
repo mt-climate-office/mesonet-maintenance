@@ -402,6 +402,12 @@
       ...MCO.map.initialCamera(urlParams),
     });
     MCO.map.addNavigation(map);                 // zoom buttons, no compass
+    // The bottom-right corner's height (the attribution, 44px tall and two
+    // lines wide on a touch tablet) as --maint-attrib-h, so the floating
+    // legend in the bottom-left can sit above it where the two would meet
+    // (index.html, #legend on touch above compact).
+    const attribCorner = document.querySelector('#map .maplibregl-ctrl-bottom-right');
+    if (attribCorner) MCO.metrics.observe('--maint-attrib-h', attribCorner);
     // onBeforeFit closes the spider: fitting out to the whole state while a
     // cluster is exploded would leave its legs drawn across empty map.
     MCO.map.addFitControl(map, { onBeforeFit: () => coloc.close() });

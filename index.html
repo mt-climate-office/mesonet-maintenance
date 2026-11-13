@@ -201,6 +201,15 @@
       left: 12px;
       min-width: 200px;
     }
+    /* On a touch tablet (above compact; on compact the legend is in the ☰
+       drawer) the kit's 44px attribution wraps to two lines and runs under
+       the legend's bottom edge (768x1024: 18px overlap). Sit the legend on
+       top of the bottom-right corner, measured live by app.js as
+       --maint-attrib-h (the attribution and MapLibre's 10px margins, so a
+       10px gap). A mouse keeps the 36px placement above. */
+    @media (hover: none) and (min-width: 641px) and (min-height: 561px) {
+      #legend { bottom: max(36px, var(--maint-attrib-h, 0px), calc(12px + env(safe-area-inset-bottom))); }
+    }
     /* Rows are the kit's .mco-legend-row (MCO.initLegendToggles); only the
        hint line under them is this map's. */
     .legend-hint {
