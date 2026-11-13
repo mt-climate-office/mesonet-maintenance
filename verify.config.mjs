@@ -206,7 +206,7 @@ export default {
     // Landscape phones (750x342, 844x390; kit 1.0.0): the bar is a 56px rail
     // at the RIGHT edge (badge, ☰, search; the mode select hides there, a
     // select doesn't fit 56px, and the drawer carries it), the map ends at
-    // the rail with zoom top right just left of it, the rail buttons are
+    // the rail with zoom top LEFT on the map (kit 1.0.0 RC 4), the rail buttons are
     // >= 44px and hittable, ☰ opens the drawer beside the rail (focus in,
     // <main> inert, the drawer's mode select reachable), Esc returns focus
     // to ☰, and "/" opens the drawer on the search field.
@@ -217,18 +217,18 @@ export default {
         const hit = (el) => { const b = r(el); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!t && el.contains(t); };
         const nav = r(document.getElementById('navbar')), map = r(document.getElementById('map'));
         const logo = r(document.querySelector('#navbar .logo-img'));
-        const zoom = document.querySelector('.maplibregl-ctrl-top-right');
+        const zoom = document.querySelector('.maplibregl-ctrl-top-left');
         const btns = ['btn-rail-menu', 'btn-rail-search'].map((id) => document.getElementById(id));
         return { vw: innerWidth, vh: innerHeight, navL: Math.round(nav.left), navR: Math.round(nav.right), navW: Math.round(nav.width), navH: Math.round(nav.height),
-          mapR: Math.round(map.right), mapH: Math.round(map.height), zoomR: zoom ? Math.round(r(zoom).right) : null, zoomT: zoom ? Math.round(r(zoom).top) : null,
+          mapR: Math.round(map.right), mapH: Math.round(map.height), zoomL: zoom ? Math.round(r(zoom).left) : null, zoomT: zoom ? Math.round(r(zoom).top) : null, zoomBtns: zoom ? zoom.querySelectorAll('button').length : 0,
           order: [Math.round(logo.top), ...btns.map((b) => Math.round(r(b).top))],
           sizes: btns.map((b) => [Math.round(r(b).width), Math.round(r(b).height)]), hit: btns.map(hit),
           selShown: document.getElementById('rail-mode-select').checkVisibility(), isRail: document.documentElement.classList.contains('is-rail') };
       });
-      check(`${vp.name}: rail at the right edge (56px, full height; badge, ☰, search top to bottom; buttons >= 44px and hittable; mode select hidden), map ends at it, zoom top right left of it`,
+      check(`${vp.name}: rail at the right edge (56px, full height; badge, ☰, search top to bottom; buttons >= 44px and hittable; mode select hidden), map ends at it, zoom top left`,
         geo.isRail && geo.navW <= 60 && geo.navR >= geo.vw - 1 && geo.navL >= geo.vw - 61 && geo.navH >= geo.vh - 1 && geo.mapR <= geo.navL + 1 && geo.mapH >= geo.vh - 12
           && geo.order[0] < geo.order[1] && geo.order[1] < geo.order[2] && geo.sizes.every(([w, h]) => w >= 44 && h >= 44) && geo.hit.every(Boolean)
-          && !geo.selShown && geo.zoomR !== null && geo.zoomR <= geo.navL + 1 && geo.zoomR >= geo.navL - 12 && geo.zoomT <= 12,
+          && !geo.selShown && geo.zoomL !== null && geo.zoomL <= 12 && geo.zoomT <= 12 && geo.zoomBtns >= 2,
         JSON.stringify(geo));
       await page.click('#btn-rail-menu');
       await page.waitForTimeout(500);
