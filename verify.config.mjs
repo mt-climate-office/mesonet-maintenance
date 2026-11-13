@@ -396,12 +396,21 @@ export default {
     // The bar never grows past one row while the sub-network chips arrive
     // from the live API (seconds after load): sample its height every 100ms
     // from 1s after navigation until the chips have been in for 2s (or 12s).
+    // A ResizeObserver also records every height the bar takes, so a change
+    // between samples (timers run late while MapLibre loads) is caught too.
     for (const vp of [{ width: 390, height: 844 }, { width: 980, height: 1700 }]) {
       const ctx = await env.browser.newContext({ viewport: vp, hasTouch: true, timezoneId: 'America/Denver' });
       await ctx.addInitScript(() => {
         try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {}
         window.__barSamples = [];
+        window.__barMaxRO = 0;
         const t0 = performance.now();
+        new MutationObserver((_, mo) => {
+          const n = document.getElementById('navbar');
+          if (!n) return;
+          mo.disconnect();
+          new ResizeObserver(() => { if (performance.now() - t0 >= 1000) window.__barMaxRO = Math.max(window.__barMaxRO, Math.round(n.getBoundingClientRect().height)); }).observe(n);
+        }).observe(document, { childList: true, subtree: true });
         setInterval(() => {
           const n = document.getElementById('navbar');
           if (!n || performance.now() - t0 < 1000) return;
@@ -411,12 +420,15 @@ export default {
       const page = await ctx.newPage();
       await page.goto(env.base);
       const chips = await page.waitForFunction(() => document.querySelectorAll('#subnet-filters .mco-chip').length > 0, null, { timeout: 12000 }).then(() => true, () => false);
-      await page.waitForTimeout(2000);
-      const s = await page.evaluate(() => window.__barSamples);
-      const max = Math.max(...s.map((x) => x[1]));
+      // Keep sampling until a sample lands 2s after the chips (timers can run
+      // late under load, so wait on the samples, not the clock).
+      await page.waitForFunction(() => { const s = window.__barSamples, f = s.find((x) => x[2] > 0); return !!f && s[s.length - 1][0] >= f[0] + 2000; }, null, { timeout: 15000 }).catch(() => {});
+      const { s, ro } = await page.evaluate(() => ({ s: window.__barSamples, ro: window.__barMaxRO }));
+      const max = Math.max(...s.map((x) => x[1]), ro);
       const firstChip = s.find((x) => x[2] > 0);
-      check(`${vp.width}x${vp.height} touch: bar <= 64px at every 100ms sample after 1s while the chips arrive (${s.length} samples, max ${max}px, chips at ${firstChip ? firstChip[0] : '-'}ms)`,
-        chips && s.length >= 20 && max <= 64 && !!firstChip, JSON.stringify({ chips, n: s.length, max, firstChip, last: s[s.length - 1] }));
+      const after = firstChip ? s.filter((x) => x[0] > firstChip[0]).length : 0;
+      check(`${vp.width}x${vp.height} touch: bar <= 64px at every 100ms sample after 1s while the chips arrive (${s.length} samples, ${after} after the chips; max ${max}px incl. ResizeObserver; chips at ${firstChip ? firstChip[0] : '-'}ms)`,
+        chips && s.length >= 10 && after >= 5 && max <= 64, JSON.stringify({ chips, n: s.length, after, max, ro, firstChip, last: s[s.length - 1] }));
       await ctx.close();
     }
     // Drill-down history: opening a station pushes ONE entry; Back closes it,
