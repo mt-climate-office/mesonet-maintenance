@@ -381,7 +381,11 @@ export default {
       const { page, close } = await open('', { ready: dataReady, viewport: vp });
       await page.click('#btn-rail-menu');
       await page.waitForTimeout(500);
-      await page.click('#btn-info');
+      // Keyboard activation: WebKit never focuses a clicked button, so a
+      // mouse click leaves the kit's opener capture (document.activeElement
+      // at open) on the drawer there; a keyboard user is on the button.
+      await page.focus('#btn-info');
+      await page.keyboard.press('Enter');
       await page.waitForTimeout(500);
       const d = await page.evaluate(() => { const m = document.getElementById('info-modal'); return { open: m.open, modal: m.matches(':modal'), inert: m.inert || !!m.closest('[inert]'), focusIn: m.contains(document.activeElement) }; });
       // Live: its close button takes a real click.
@@ -389,7 +393,7 @@ export default {
       await page.keyboard.press('Escape');
       await page.waitForTimeout(500);
       const a2 = await page.evaluate(() => ({ open: document.getElementById('info-modal').open, focus: document.activeElement?.id, drawer: document.getElementById('nav-drawer').classList.contains('is-open') }));
-      check(`${vp.name}: info dialog from the open ☰ drawer is live (modal, focus inside, hittable); Esc closes it, focus back on ? in the still-open drawer`,
+      check(`${vp.name}: info dialog from the open ☰ drawer (Enter on ?) is live (modal, focus inside, hittable); Esc closes it, focus back on ? in the still-open drawer`,
         d.open && d.modal && !d.inert && d.focusIn && hit && !a2.open && a2.focus === 'btn-info' && a2.drawer, JSON.stringify({ d, hit, a2 }));
       await close();
     }

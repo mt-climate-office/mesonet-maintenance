@@ -1040,7 +1040,7 @@
       b.style.backgroundImage = `url("${p.thumb}")`;
       b.setAttribute('aria-label', `View photo ${i + 1} of ${photos.length}`);
       if (p.filename) b.title = String(p.filename);
-      b.addEventListener('click', () => openLightbox(photos, i));
+      b.addEventListener('click', () => openLightbox(photos, i, b));
       wrap.appendChild(b);
     });
     return wrap;
@@ -1048,7 +1048,7 @@
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightbox-img');
   const lightboxCaption = document.getElementById('lightbox-caption');
-  let _lb = { photos: [], index: 0 };
+  let _lb = { photos: [], index: 0, opener: null };
   function renderLightbox() {
     const p = _lb.photos[_lb.index];
     if (!p) return;
@@ -1060,8 +1060,11 @@
     document.getElementById('lightbox-prev').style.display = multi ? '' : 'none';
     document.getElementById('lightbox-next').style.display = multi ? '' : 'none';
   }
-  function openLightbox(photos, index) {
-    _lb = { photos: photos || [], index: index || 0 };
+  // The thumb that opened it gets focus back on close. Named explicitly:
+  // WebKit doesn't focus a button on a click or tap, so the dialog's own
+  // restore would land on whatever had focus before (the panel's title).
+  function openLightbox(photos, index, opener) {
+    _lb = { photos: photos || [], index: index || 0, opener: opener || null };
     renderLightbox();
     if (!lightbox.open) lightbox.showModal();
   }
@@ -1077,6 +1080,7 @@
     if (lightbox.open) lightbox.close();
     lightboxImg.src = BLANK_PX;
     lightboxImg.hidden = true;
+    if (_lb.opener && _lb.opener.isConnected) _lb.opener.focus({ preventScroll: true });
   }
   document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
   document.getElementById('lightbox-prev').addEventListener('click', () => stepLightbox(-1));
