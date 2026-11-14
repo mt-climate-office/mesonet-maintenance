@@ -28,12 +28,12 @@ stamp (`MCO.formatUpdatedMT`), the first-visit intro (`initInfoModal`'s
 
 ## Data
 
-Two absolute API URLs, both under `API_BASE` at the top of `app.js`
-(`https://mesonet2.climate.umt.edu/api/v2`): `/stations/?type=json` and
+Two absolute API URLs, both under `API_BASE`, built from `MESONET_ORIGIN` at
+the top of `app.js` (`https://mesonet2.climate.umt.edu`, also the dashboard host): `/stations/?type=json` and
 `/stations/maintenance/live?type=json`. The maintenance feed is a live AirTable
 read served by the mesonet-db-rds API (`api/app/app/registry.py` there; 300 s
 cache). The page is cross-origin to the API everywhere — GitHub Pages origin and
-the `mesonet.climate.umt.edu/maintenance/` proxy alike — so `API_BASE` must
+the `mesonet.climate.umt.edu/maintenance/` proxy alike — so `MESONET_ORIGIN` must
 also be listed in the meta CSP `connect-src`, and the API must keep answering
 with CORS `*`. If the API host changes, change both.
 

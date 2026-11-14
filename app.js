@@ -16,15 +16,21 @@
   'use strict';
 
   // ── Constants ────────────────────────────────────────────────────────────
-  // Absolute: this page is a static GitHub Pages site (proxied at
-  // mesonet.climate.umt.edu/maintenance/), so the API is always cross-origin.
-  // The maintenance feed is a live AirTable read that only the mesonet-db-rds
-  // API serves; it answers with CORS `*`. The host must also appear in the
-  // meta CSP connect-src in index.html.
-  const API_BASE     = 'https://mesonet2.climate.umt.edu/api/v2';
+  // The Mesonet host for the dashboard and the API. At the cutover this becomes
+  // 'https://mesonet.climate.umt.edu'. Change it here, and in the CSP and README.
+  const MESONET_ORIGIN = 'https://mesonet2.climate.umt.edu';
+  // Absolute: this page is a static GitHub Pages site (proxied under
+  // /maintenance/), so the API is always cross-origin. The maintenance feed is
+  // a live AirTable read that only the mesonet-db-rds API serves; it answers
+  // with CORS `*`. MESONET_ORIGIN must also appear in the meta CSP connect-src
+  // in index.html.
+  const API_BASE     = `${MESONET_ORIGIN}/api/v2`;
   const STATIONS_URL = `${API_BASE}/stations/?type=json`;
   const MAINT_URL    = `${API_BASE}/stations/maintenance/live?type=json`;
-  const DASH_URL     = (s) => `https://mesonet.climate.umt.edu/dash/${encodeURIComponent(s)}`;
+  const DASH_URL     = (s) => `${MESONET_ORIGIN}/dash/?s=${encodeURIComponent(s)}`;
+  // The help's API docs link, set here so the host lives in one place.
+  const apiDocsLink = document.getElementById('api-docs-link');
+  if (apiDocsLink) apiDocsLink.href = `${API_BASE}/docs`;
 
 
   const SEARCH_FLY_ZOOM         = 11;     // zoom when search/deep-link flies to a station

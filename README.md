@@ -42,6 +42,9 @@ Values are case-insensitive. Lists take `+`, spaces or commas.
 - `https://mesonet2.climate.umt.edu/api/v2/stations/maintenance/live?type=json`: visits, read live from the AirTable maintenance log with a 5-minute cache.
 - Visit photos are AirTable attachments on `*.airtableusercontent.com`. The CSP `img-src` must allow that host.
 - `data/`: the state outline and reservation overlays.
+- The station panel links to `https://mesonet2.climate.umt.edu/dash/?s=<id>`.
+
+Cutover: change `MESONET_ORIGIN` in `app.js` and the CSP `connect-src`.
 
 ## Tests
 
