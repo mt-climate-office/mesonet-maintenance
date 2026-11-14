@@ -314,6 +314,11 @@
     @media (hover: none) { .visit-photo-thumb { width: 52px; height: 52px; } .lightbox-nav { font-size: 2.4rem; } }
 
 
+    /* ── Help (info modal) ─────────────────────────────────────────────────── */
+    /* kit-override: the kit does not style <details> in the info outline yet (kit 1.0.1 will; delete this then). */
+    .info-section summary { cursor: pointer; font-weight: 600; color: var(--text-secondary); padding: 0.6rem 0; }
+    .info-section code, .info-section kbd { white-space: nowrap; }
+
     /* ── Responsive ────────────────────────────────────────────────────────── */
     /* The kit owns the ladder above this: the ≤1400px button-label shed (and
        the word "Updated" in the stamp), the ≤750px collapse of the brand
@@ -583,7 +588,7 @@
         <li>Pick a color mode in the bar.</li>
         <li>Tap a station for its visits and photos.</li>
         <li>Tap a legend row to hide that category. Double-tap to show only it.</li>
-        <li>Use <strong>HydroMet</strong> and <strong>AgriMet</strong> to show or hide a network.</li>
+        <li>Tap <strong>HydroMet</strong> or <strong>AgriMet</strong> to show or hide that network.</li>
         <li>Keys: <kbd>/</kbd> search, <kbd>←</kbd> <kbd>→</kbd> step photos, <kbd>Esc</kbd> close. Add <code>?kbd=off</code> to the address to turn off <kbd>/</kbd>.</li>
       </ul>
     </div>
