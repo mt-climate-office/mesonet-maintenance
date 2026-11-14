@@ -402,6 +402,12 @@
       ...MCO.map.initialCamera(urlParams),
     });
     MCO.map.addNavigation(map);                 // zoom buttons, no compass
+    // The bottom-right corner's height (the attribution, 44px tall and two
+    // lines wide on a touch tablet) as --maint-attrib-h, so the floating
+    // legend in the bottom-left can sit above it where the two would meet
+    // (index.html, #legend on touch above compact).
+    const attribCorner = document.querySelector('#map .maplibregl-ctrl-bottom-right');
+    if (attribCorner) MCO.metrics.observe('--maint-attrib-h', attribCorner);
     // onBeforeFit closes the spider: fitting out to the whole state while a
     // cluster is exploded would leave its legs drawn across empty map.
     MCO.map.addFitControl(map, { onBeforeFit: () => coloc.close() });
@@ -1034,7 +1040,7 @@
       b.style.backgroundImage = `url("${p.thumb}")`;
       b.setAttribute('aria-label', `View photo ${i + 1} of ${photos.length}`);
       if (p.filename) b.title = String(p.filename);
-      b.addEventListener('click', () => openLightbox(photos, i));
+      b.addEventListener('click', () => openLightbox(photos, i, b));
       wrap.appendChild(b);
     });
     return wrap;
@@ -1042,7 +1048,7 @@
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightbox-img');
   const lightboxCaption = document.getElementById('lightbox-caption');
-  let _lb = { photos: [], index: 0 };
+  let _lb = { photos: [], index: 0, opener: null };
   function renderLightbox() {
     const p = _lb.photos[_lb.index];
     if (!p) return;
@@ -1054,8 +1060,11 @@
     document.getElementById('lightbox-prev').style.display = multi ? '' : 'none';
     document.getElementById('lightbox-next').style.display = multi ? '' : 'none';
   }
-  function openLightbox(photos, index) {
-    _lb = { photos: photos || [], index: index || 0 };
+  // The thumb that opened it gets focus back on close. Named explicitly:
+  // WebKit doesn't focus a button on a click or tap, so the dialog's own
+  // restore would land on whatever had focus before (the panel's title).
+  function openLightbox(photos, index, opener) {
+    _lb = { photos: photos || [], index: index || 0, opener: opener || null };
     renderLightbox();
     if (!lightbox.open) lightbox.showModal();
   }
@@ -1071,6 +1080,7 @@
     if (lightbox.open) lightbox.close();
     lightboxImg.src = BLANK_PX;
     lightboxImg.hidden = true;
+    if (_lb.opener && _lb.opener.isConnected) _lb.opener.focus({ preventScroll: true });
   }
   document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
   document.getElementById('lightbox-prev').addEventListener('click', () => stepLightbox(-1));
@@ -1154,10 +1164,9 @@
     const pill = STATE_PILL[state] || STATE_PILL.overdue;
     const body = document.createDocumentFragment();
 
-    // [data-peek]: what the bottom sheet's peek detent shows (pill + facts).
-    const peek = el('div');
-    peek.dataset.peek = '';
-    body.appendChild(peek);
+    // The summary: the state pill, then facts or a note.
+    const summary = el('div');
+    body.appendChild(summary);
     // The state pill: a dot in the station's compliance color (the map's
     // mark in Compliance mode) and the state named in text.
     const pillRow = el('div');
@@ -1169,7 +1178,7 @@
     else dot.style.setProperty('--pill-color', cat.color);
     pillEl.append(dot, pill.lbl);
     pillRow.appendChild(pillEl);
-    peek.appendChild(pillRow);
+    summary.appendChild(pillRow);
 
     // Facts where there are values; a prose note where the state needs one.
     const facts = [];
@@ -1190,8 +1199,8 @@
       note = 'No Maintenance visit on record.';
       if (m && m.last_visit_date) facts.push(['Last visit (any type)', fmtDate(m.last_visit_date)]);
     }
-    if (facts.length) peek.appendChild(factsEl(facts));
-    if (note) peek.appendChild(el('p', 'pop-summary', note));
+    if (facts.length) summary.appendChild(factsEl(facts));
+    if (note) summary.appendChild(el('p', 'pop-summary', note));
 
     if (m && m.visits && m.visits.length) {
       body.appendChild(el('div', 'pop-section-title', 'Visits'));
@@ -1235,15 +1244,16 @@
     return frag;
   }
 
-  // ── Station sheet (MCO.initSheet at every width, kit 0.21.0) ──────────────
-  // End-docked above compact, a bottom sheet on a phone, never an anchored
-  // popup. The kit gives peek (pill + summary) and full detents, drag and
-  // its keyboard twin, focus to the title and back to the opener, and
-  // modality only in the full detent on compact. The two dialogs stay live:
-  // a thumb in the sheet opens the lightbox over it.
-  // The bar's height as --chrome-h, which the kit's phone bottom sheet keeps
-  // clear of (its full-detent max-height). The end-docked sheet measures the
-  // bar itself since kit 0.21.1. (The landscape rail forces it back to 0.)
+  // ── Station sheet (MCO.initSheet at every width; one state, kit 1.0.0) ─────
+  // End-docked above compact with the map live; on a phone a full-height
+  // panel under the bar (left of the rail in landscape), never an anchored
+  // popup. The kit gives focus to the title and back to the opener, the
+  // close button, and modality on compact, where the bar stays live (the kit
+  // takes .mco-navbar out of the inert set). The two dialogs stay live too:
+  // a thumb in the panel opens the lightbox over it.
+  // The bar's height as --chrome-h: the kit's fallback for the panel's top
+  // when its own measure (--sheet-top) is unset. (The landscape rail forces
+  // it back to 0.)
   MCO.metrics.observe('--chrome-h', document.getElementById('navbar'));
   const sheetEl = document.getElementById('station-sheet');
   const sheetTitleEl = document.getElementById('station-sheet-title');
@@ -1251,10 +1261,9 @@
   let _sheetOpen = false;
   const stationSheet = MCO.initSheet({
     sheet: sheetEl,
-    peekHeight: 'auto',
-    // A function (kit 0.11.3): resolved each time the full detent goes
-    // modal, so whatever sits beside the sheet then is covered. The two
-    // dialogs stay live: a thumb in the sheet opens the lightbox over it.
+    // A function (kit 0.11.3): resolved each time the panel goes modal on
+    // compact, so whatever sits beside it then is covered. The two dialogs
+    // stay live: a thumb in the panel opens the lightbox over it.
     inertRoots: () => MCO.overlay.siblingsOf(sheetEl, [infoModal, document.getElementById('lightbox')]),
     fallbackFocus: document.getElementById('map'),
     onState: (st) => {
@@ -1282,7 +1291,7 @@
     const first = !_selectedStation || !_sheetOpen;
     _selectedStation = stationId;
     fillSheet(stationId);
-    if (!_sheetOpen) stationSheet.open('peek', { opener: o.opener });
+    if (!_sheetOpen) stationSheet.open({ opener: o.opener });
     else sheetTitleEl.focus({ preventScroll: true });   // the old content (and focus) is gone
     paintSelection();
     srTwin.render(_srRows, { selected: stationId });
@@ -1525,7 +1534,10 @@
     const saved = MCO.lsGet('mco-maint-legend');
     if (saved === 'collapsed' || saved === '1') return true;
     if (saved === 'expanded'  || saved === '0') return false;
-    return MCO.viewport.isCompact();   // no preference: start collapsed on a phone
+    // No preference: open at every width. On a phone the legend is a group
+    // in the ☰ drawer (MCO.initLegendDrawer below), not a panel over the
+    // map, so it no longer starts collapsed there (kit 1.0.0).
+    return false;
   })();
 
   // apply() runs once at init and calls onChange with it. Don't let that first
@@ -1544,6 +1556,13 @@
     },
   });
   _legendInit = false;
+
+  // On a phone (MCO.viewport.isCompact) the legend moves into a "Legend"
+  // group at the end of the ☰ drawer, and a Legend button takes its corner
+  // on the map and opens the drawer at it (kit 1.0.0). Above compact it
+  // floats as before. The panel moves whole: its collapse and toggles go
+  // with it.
+  MCO.initLegendDrawer({ panel: document.getElementById('legend'), rail });
 
   // ── Legend (Plotly-style toggles) ────────────────────────────────────────
   // MCO.initLegendToggles (kit 0.8.0) owns the interaction: click toggles a

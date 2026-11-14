@@ -43,9 +43,9 @@
   <!-- Favicons / app icons: hot-linked from the pinned kit tag (kit 0.9.0,
        decided 2026-10-08) so they version with the kit. img-src allows
        cdn.jsdelivr.net for them. The navbar logo stays vendored. -->
-  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/assets/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/assets/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/assets/apple-touch-icon.png">
 
   <!-- Open Graph (Facebook, LinkedIn, Slack, Discord, iMessage, etc.) -->
   <meta property="og:type"             content="website">
@@ -101,8 +101,8 @@
   <!-- House fonts: kit-hosted (mco-web-style 0.7.0), declared in mco-theme.css.
        Preloaded so the first frame is already in Outfit — no system-font flash.
        Same @version as the theme CSS; crossorigin is required on font preloads. -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
   <!-- MapLibre GL 6 (kit 0.8.0+): ES modules only, imported on demand by
        MCO.map.loadMapLibre(). The import map carries the SRI hashes and is ONE
        LINE, byte for byte from the kit snippet, so its CSP sha256 holds. -->
@@ -117,11 +117,11 @@
         integrity="sha384-ntw3zEt6rcVML7jDK0ULmHa5hxLB23afsPqzqfY+gLgMfAkbFCnCgPpkZvV5mmZX"
         crossorigin="anonymous">
 
-  <!-- mco-web-style @0.21.2 — tokens, reset, a11y utilities, navbar/panel/toast/
+  <!-- mco-web-style @1.0.0 — tokens, reset, a11y utilities, navbar/panel/toast/
        tooltip/modal shells, MapLibre control polish. Everything below in
        <style> is what remains app-specific after the kit took the rest. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/theme/mco-theme.css"
-        integrity="sha384-6b+8YTXHtiLQOLwPSXvqmgnA4QlUZ87oGCr9kwLwAHCTV+oDPCkM0IK6mve/4BeY"
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/theme/mco-theme.css"
+        integrity="sha384-sYr4fDiezV2VCn92FyWqmM9kKbbJPMUCqf7xIkQqLyFlSbMmWCTGdAzNPlm6cJ65"
         crossorigin="anonymous">
 
   <style>
@@ -158,9 +158,6 @@
     #empty-state { pointer-events: none; }
     #empty-state[hidden] { display: none; }
     #empty-state strong { color: var(--text-primary); font-weight: 600; }
-    /* kit-override: on a phone the centered callout ran under the zoom/fit
-       controls (top-right); keep it clear of that 56px column. */
-    @media (max-width: 640px) { #empty-state { max-width: calc(100% - 7.5rem); } }
 
     /* ── Search (the kit's .mco-search, MCO.initSearchBox) ────────────────
        Field, icon and listbox are kit-owned. Only the "/" hint is this map's. */
@@ -192,11 +189,23 @@
     /* ── Legend (bottom-left, collapsible) ────────────────────────────────── */
     /* The panel shell, its header/title/toggle, the caret rotation and the
        animated collapse all come from .mco-panel + MCO.initCollapsible. Only
-       this map's placement and its row contents are app-specific. */
+       this map's placement and its row contents are app-specific. On a phone
+       MCO.initLegendDrawer (kit 1.0.0) moves the panel into a "Legend" group
+       in the ☰ drawer (where the kit's .is-in-drawer resets its placement)
+       and puts a Legend button in this corner. */
     #legend {
       bottom: max(36px, calc(12px + env(safe-area-inset-bottom)));
       left: 12px;
       min-width: 200px;
+    }
+    /* On a touch tablet (above compact; on compact the legend is in the ☰
+       drawer) the kit's 44px attribution wraps to two lines and runs under
+       the legend's bottom edge (768x1024: 18px overlap). Sit the legend on
+       top of the bottom-right corner, measured live by app.js as
+       --maint-attrib-h (the attribution and MapLibre's 10px margins, so a
+       10px gap). A mouse keeps the 36px placement above. */
+    @media (hover: none) and (min-width: 641px) and (min-height: 561px) {
+      #legend { bottom: max(36px, var(--maint-attrib-h, 0px), calc(12px + env(safe-area-inset-bottom))); }
     }
     /* Rows are the kit's .mco-legend-row (MCO.initLegendToggles); only the
        hint line under them is this map's. */
@@ -207,7 +216,7 @@
     }
 
     /* ── Station sheet ─────────────────────────────────────────────────────── */
-    /* The shell (surface, head, grip, close, detents) is the kit's
+    /* The shell (surface, head, close, full-height phone panel) is the kit's
        MCO.initSheet, and the title/subtitle/action bar inside it are
        MCO.map.popupContent's. What follows is this map's visit history.
        The status pill is neutral (--text-primary on the sheet surface, so
@@ -237,7 +246,10 @@
       text-transform: uppercase; color: var(--text-muted);
       border-bottom: 1px solid var(--border); padding-bottom: 3px;
     }
-    .pop-scroll { max-height: 230px; overflow-y: auto; margin-top: 4px; }
+    /* The visit list flows in the panel body, which scrolls (kit 1.0.0: the
+       panel is full height at every width). Its old 230px inner scroller,
+       from the anchored-popup days, nested a second scroll area inside it. */
+    .pop-scroll { margin-top: 4px; }
     .visit-item { padding: 6px 2px; border-bottom: 1px solid var(--border-glass); font-size: 0.73rem; }
     .visit-item:last-child { border-bottom: 0; }
     .visit-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -334,8 +346,9 @@
       .nav-meta { gap: 0.3rem; }   /* kit-override: tighter nav buttons at the 1400 rung, see above */
     }
     /* The rail's mode select is the compact bar's hot control. In the
-       short-landscape rail (a 56px column, MCO.viewport.RAIL_MQ) it can't
-       fit, so it hides there and the drawer's select stays the way in. */
+       short-landscape rail (a 56px column at the right edge,
+       MCO.viewport.RAIL_MQ) a select can't fit, so it hides there and the
+       drawer's select stays the way in (MIGRATING 0.21.2 → 1.0.0, step 3). */
     @media (max-height: 560px) and (orientation: landscape) {
       #rail-mode-select { display: none; }
     }
@@ -358,7 +371,8 @@
      logo badge at the left edge, then the color-mode select (this map's hot
      control), the search button and ☰ at the right edge. Everything in
      .mco-nav-drawer opens as a right drawer from ☰ (MCO.initNavRail). On a
-     landscape phone (~750x342) the same .mco-rail is a 56px left rail.
+     landscape phone (~750x342) the same bar is a 56px rail at the RIGHT edge
+     (kit 1.0.0): badge, ☰, search, with the drawer opening beside it.
      Above compact .mco-rail is display:none and .mco-nav-drawer is
      display:contents, so the desktop bar lays out as one row. -->
 <header id="navbar" class="mco-navbar" data-rail="compact">
@@ -516,15 +530,15 @@
      rebuilt on every repaint) is MCO.srTable's, appended here by app.js. -->
 </main>
 
-<!-- Station detail at every width (MCO.initSheet, kit 0.21.0): end-docked
-     above compact, a bottom sheet on a phone; app.js fills it. Outside
-     <main> so its full detent can make <main> and the navbar inert while
-     the dialogs stay live. -->
+<!-- Station detail at every width (MCO.initSheet; one state since kit
+     1.0.0): end-docked above compact with the map live, full height under
+     the bar on a phone; app.js fills it. Outside <main> so on a phone it can
+     make <main> inert while the bar and the dialogs stay live. The close
+     button is the only close on a touch screen (44px, every width). -->
 <section class="mco-sheet" id="station-sheet" aria-labelledby="station-sheet-title" data-state="closed" hidden>
   <div class="mco-sheet-head">
-    <button type="button" class="mco-sheet-grip" aria-label="Expand details" aria-expanded="false"></button>
     <h2 class="mco-sheet-title" id="station-sheet-title" tabindex="-1">Station</h2>
-    <button type="button" class="modal-close" data-close-sheet aria-label="Close">×</button>
+    <button type="button" class="modal-close" data-close-sheet aria-label="Close station details">×</button>
   </div>
   <div class="mco-sheet-body"></div>
 </section>
@@ -553,7 +567,7 @@
         <li><strong>Time since</strong>: how long since the last Maintenance visit, for every network. An empty (unfilled) dot has never had one.</li>
         <li><strong>Trip type</strong>: the type of the most recent completed visit.</li>
       </ul>
-      <p>The legend names each color.</p>
+      <p>The legend names each color. On a phone it is in the menu (☰); the Legend button on the map opens it there.</p>
     </div>
 
     <div class="info-section">
@@ -594,20 +608,20 @@
   <div class="lightbox-caption" id="lightbox-caption"></div>
 </dialog>
 
-<!-- mco-web-style @0.21.2 — classic scripts, so they must precede app.js.
+<!-- mco-web-style @1.0.0 — classic scripts, so they must precede app.js.
      MapLibre is not among them: mco-map.js imports it on demand
      (MCO.map.loadMapLibre). mco-palette.js precedes mco-map.js, whose
      markerPaint() reads it. SRI hashes are the kit README's table for this
      exact tag; bumping @version without recomputing them hard-fails in the
      browser, which is the point. -->
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/core/mco-core.js"
-        integrity="sha384-xNdr9/kMYOXBLa6aHuU637Nln0S73l6QjvB9Ld7vqCvwcqZ6wzs69YziKejo8M3w"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/core/mco-core.js"
+        integrity="sha384-D7xlWfDfWcrBYM29SxNSZ9sjoFbu9VmboXzztcMMqsSm10bhGta1w4i7Q/mveU3A"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/palette/mco-palette.js"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/palette/mco-palette.js"
         integrity="sha384-bMyfpU5iEKAQiHDJZLqmCMt3sTGm+HBi2GIY7I9xLyV+JYrbGgHOX9+/XVXy8CYV"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.21.2/map/mco-map.js"
-        integrity="sha384-8ZLN6Xhnts1kIMbDa9M+H05sYgu770WLohBOrch1nTafMd+HEM7PlrP0e4fCoRb8"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/map/mco-map.js"
+        integrity="sha384-eWrG2T3udOw4ET+hy7Sq0BR/c4jCKD2+Cy4TEV2m4Dd6BL5VXGZXS2n8B8y+8v4z"
         crossorigin="anonymous"></script>
 
 <script src="app.js"></script>

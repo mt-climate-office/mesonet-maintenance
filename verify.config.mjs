@@ -73,8 +73,8 @@ export default {
   scenarios: [
     { name: 'default', query: '', ready: dataReady },
     { name: 'triptype+labels', query: '?mode=triptype&labels=on', ready: dataReady },
-    // A hidden category with the legend open: the 390 default starts with
-    // the legend collapsed, so without this its rows are never measured.
+    // A hidden category with the legend open (explicitly, so a stored
+    // collapse can't hide its rows from the scan).
     { name: 'legend-off', query: '?cat-compliance=visited+new&legend=open', ready: dataReady },
     // Every category hidden: the .mco-empty callout over the map.
     { name: 'empty-state', query: '?cat-compliance=', ready: () => document.querySelectorAll('#sr-station-table tbody tr').length > 100 && !document.getElementById('empty-state').hidden },
@@ -82,7 +82,7 @@ export default {
     // exists after a click, so a load-only scan never audits it.
     { name: 'station-sheet', query: '?station=aceashla&lng=-106.14&lat=45.57&zoom=9', ready: () => !!document.querySelector('#station-sheet:not([hidden]) .visit-photo-thumb') },
     // The plain ?station= deep link (no camera): flies in and opens the
-    // sheet, end-docked at 1440 and a bottom sheet at 390. Absarokee is a
+    // panel, end-docked at 1440 and full height at 390. Absarokee is a
     // colocated site, so its sheet carries "Also at this site".
     { name: 'deep-link', query: '?station=aceabsar', ready: () => {
       const s = document.getElementById('station-sheet');
@@ -106,6 +106,18 @@ export default {
   dialogOpener: '#btn-info',
   shortcuts: [{ key: '/', effect: () => document.activeElement?.id === 'search-input' }],
   probes: async ({ env, open, check }) => {
+    // Inputs first: the page is served (200) and both live API feeds answer
+    // 200 with rows, so a probe below can't pass on an empty or failed load.
+    {
+      const ctx = await env.browser.newContext();
+      const get = async (url) => { const r = await ctx.request.get(url, { timeout: 30000 }).catch(() => null); if (!r) return [0, 0]; const t = await r.text(); let n = t.length; try { const j = JSON.parse(t); n = Array.isArray(j) ? j.length : Object.keys(j).length; } catch {} return [r.status(), n]; };
+      const pg = await get(env.base + 'index.html');
+      const st = await get('https://mesonet2.climate.umt.edu/api/v2/stations/?type=json');
+      const mt = await get('https://mesonet2.climate.umt.edu/api/v2/stations/maintenance/live?type=json');
+      check(`inputs: page ${pg[0]} (${pg[1]} bytes), /stations/ ${st[0]} (${st[1]} rows), /maintenance/live ${mt[0]} (${mt[1]} rows)`,
+        pg[0] === 200 && pg[1] > 10000 && st[0] === 200 && st[1] > 100 && mt[0] === 200 && mt[1] > 0, JSON.stringify({ pg, st, mt }));
+      await ctx.close();
+    }
     // The map draws its data, not just the basemap.
     {
       const { page, close, problems } = await open('', { ready: dataReady, settleMs: 2500 });
@@ -191,23 +203,49 @@ export default {
       check('theme toggle cycles dark -> light -> high contrast -> dark; HC repaints dots', ok, JSON.stringify(seen));
       await close();
     }
-    // Landscape phone (750x342): the bar is a 56px rail; the menu opens the
-    // drawer (focus in, <main> inert), Esc returns focus to the toggle, and
-    // "/" opens the drawer on the search field.
-    {
-      const { page, close } = await open('', { ready: dataReady, viewport: { name: 'land', width: 750, height: 342, touch: true } });
-      const geo = await page.evaluate(() => [document.getElementById('navbar').getBoundingClientRect().width, document.getElementById('map').getBoundingClientRect().height]);
+    // Landscape phones (750x342, 844x390; kit 1.0.0): the bar is a 56px rail
+    // at the RIGHT edge (badge, ☰, search; the mode select hides there, a
+    // select doesn't fit 56px, and the drawer carries it), the map ends at
+    // the rail with zoom top LEFT on the map (kit 1.0.0 RC 4), the rail buttons are
+    // >= 44px and hittable, ☰ opens the drawer beside the rail (focus in,
+    // <main> inert, the drawer's mode select reachable), Esc returns focus
+    // to ☰, and "/" opens the drawer on the search field.
+    for (const vp of [{ name: '750x342', width: 750, height: 342, touch: true }, { name: '844x390', width: 844, height: 390, touch: true }]) {
+      const { page, close } = await open('', { ready: dataReady, viewport: vp });
+      const geo = await page.evaluate(() => {
+        const r = (el) => el.getBoundingClientRect();
+        const hit = (el) => { const b = r(el); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!t && el.contains(t); };
+        const nav = r(document.getElementById('navbar')), map = r(document.getElementById('map'));
+        const logo = r(document.querySelector('#navbar .logo-img'));
+        const zoom = document.querySelector('.maplibregl-ctrl-top-left');
+        const btns = ['btn-rail-menu', 'btn-rail-search'].map((id) => document.getElementById(id));
+        return { vw: innerWidth, vh: innerHeight, navL: Math.round(nav.left), navR: Math.round(nav.right), navW: Math.round(nav.width), navH: Math.round(nav.height),
+          mapR: Math.round(map.right), mapH: Math.round(map.height), zoomL: zoom ? Math.round(r(zoom).left) : null, zoomT: zoom ? Math.round(r(zoom).top) : null, zoomBtns: zoom ? zoom.querySelectorAll('button').length : 0,
+          order: [Math.round(logo.top), ...btns.map((b) => Math.round(r(b).top))],
+          sizes: btns.map((b) => [Math.round(r(b).width), Math.round(r(b).height)]), hit: btns.map(hit),
+          selShown: document.getElementById('rail-mode-select').checkVisibility(), isRail: document.documentElement.classList.contains('is-rail') };
+      });
+      check(`${vp.name}: rail at the right edge (56px, full height; badge, ☰, search top to bottom; buttons >= 44px and hittable; mode select hidden), map ends at it, zoom top left`,
+        geo.isRail && geo.navW <= 60 && geo.navR >= geo.vw - 1 && geo.navL >= geo.vw - 61 && geo.navH >= geo.vh - 1 && geo.mapR <= geo.navL + 1 && geo.mapH >= geo.vh - 12
+          && geo.order[0] < geo.order[1] && geo.order[1] < geo.order[2] && geo.sizes.every(([w, h]) => w >= 44 && h >= 44) && geo.hit.every(Boolean)
+          && !geo.selShown && geo.zoomL !== null && geo.zoomL <= 12 && geo.zoomT <= 12 && geo.zoomBtns >= 2,
+        JSON.stringify(geo));
       await page.click('#btn-rail-menu');
-      await page.waitForTimeout(400);
-      const o = await page.evaluate(() => [document.getElementById('nav-drawer').contains(document.activeElement), document.getElementById('main').inert]);
+      await page.waitForTimeout(500);
+      const o = await page.evaluate(() => {
+        const d = document.getElementById('nav-drawer').getBoundingClientRect(), nav = document.getElementById('navbar').getBoundingClientRect();
+        return { inDrawer: document.getElementById('nav-drawer').contains(document.activeElement), field: document.activeElement?.tagName, mainInert: document.getElementById('main').inert,
+          dR: Math.round(d.right), dL: Math.round(d.left), navL: Math.round(nav.left), sel: document.getElementById('mode-select').checkVisibility() || document.getElementById('mode-seg').checkVisibility() };
+      });
       await page.keyboard.press('Escape');
       await page.waitForTimeout(400);
       const c = await page.evaluate(() => [document.activeElement?.id, document.getElementById('main').inert]);
       await page.keyboard.press('/');
       await page.waitForTimeout(400);
       const sl = await page.evaluate(() => document.activeElement?.id);
-      check('750x342: rail (56px, map full height); drawer focus/inert/Esc; "/" -> search',
-        geo[0] <= 60 && geo[1] >= 330 && o[0] && o[1] && c[0] === 'btn-rail-menu' && !c[1] && sl === 'search-input', JSON.stringify({ geo, o, c, sl }));
+      check(`${vp.name}: ☰ opens the drawer beside the rail (focus in, not a field; <main> inert; the mode control in it); Esc -> ☰; "/" -> search`,
+        o.inDrawer && o.field !== 'INPUT' && o.mainInert && o.dR <= o.navL + 1 && o.dR >= o.navL - 1 && o.dL > 0 && o.sel && c[0] === 'btn-rail-menu' && !c[1] && sl === 'search-input',
+        JSON.stringify({ o, c, sl }));
       await close();
     }
     // Color mode: segmented buttons at 1440, a <select> at <=1060 — one value.
@@ -260,37 +298,205 @@ export default {
       check(`search lists matches (${opts}) and Enter opens that station's sheet`, opts > 0 && opened);
       await close();
     }
-    // Compact: a station opens the bottom sheet (peek), the grip takes it to
-    // full (modal: <main> inert), the lightbox still works from it, and Esc
-    // closes it and drops ?station=.
-    {
-      const { page, close } = await open('?station=aceashla&lng=-106.14&lat=45.57&zoom=9', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
-      const peek = await page.waitForSelector('#station-sheet[data-state="peek"]', { timeout: 15000 }).then(() => true, () => false);
-      const noPopup = await page.locator('.maplibregl-popup').count() === 0;
-      const title = await page.evaluate(() => [document.getElementById('station-sheet-title').textContent, document.activeElement?.id]);
-      check('compact deep link opens the sheet at peek (no anchored popup), focus on its title', peek && noPopup && title[0] === 'Ashland' && title[1] === 'station-sheet-title', JSON.stringify({ peek, noPopup, title }));
-      await page.locator('#station-sheet .mco-sheet-grip').focus();
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(500);
-      const full = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, inert: document.getElementById('main').inert }));
-      check('grip Enter -> full detent, <main> inert', full.st === 'full' && full.inert, JSON.stringify(full));
+    // Compact (kit 1.0.0): a station opens the ONE-state panel, full height
+    // under the bar (390x844) or left of the rail (844x390): its rect is the
+    // viewport less the bar, <main> inert, the bar live. The 44px close
+    // button sits top right and is hittable. The lightbox still works from
+    // it (not inert, Next steps), its Esc closes only the lightbox, and Esc
+    // then closes the panel and drops ?station=.
+    for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '844x390', width: 844, height: 390, touch: true }]) {
+      const { page, close } = await open('?station=aceashla&lng=-106.14&lat=45.57&zoom=9', { ready: dataReady, viewport: vp });
+      const full = await page.waitForSelector('#station-sheet[data-state="full"]', { timeout: 15000 }).then(() => true, () => false);
+      await page.waitForTimeout(600);
+      const st = await page.evaluate(() => {
+        const r = (el) => el.getBoundingClientRect();
+        const sh = r(document.getElementById('station-sheet')), nav = r(document.getElementById('navbar'));
+        const x = document.querySelector('#station-sheet [data-close-sheet]'), xb = r(x);
+        const t = document.elementFromPoint(xb.left + xb.width / 2, xb.top + xb.height / 2);
+        const rail = document.documentElement.classList.contains('is-rail');
+        return { vw: innerWidth, vh: innerHeight, rail, sh: [sh.left, sh.top, sh.right, sh.bottom].map(Math.round), nav: [nav.left, nav.bottom].map(Math.round),
+          title: document.getElementById('station-sheet-title').textContent, focus: document.activeElement?.id,
+          grip: !!document.querySelector('#station-sheet .mco-sheet-grip, #station-sheet [data-peek]'),
+          popups: document.querySelectorAll('.maplibregl-popup').length,
+          mainInert: document.getElementById('main').inert, navInert: document.getElementById('navbar').inert || !!document.getElementById('navbar').closest('[inert]'),
+          close: [Math.round(xb.width), Math.round(xb.height), Math.round(sh.right - xb.right), Math.round(xb.top - sh.top)], closeHit: !!t && x.contains(t) };
+      });
+      const want = st.rail ? [0, 0, st.nav[0], st.vh] : [0, st.nav[1], st.vw, st.vh];
+      check(`${vp.name}: deep link opens the full-height panel (state full, rect = viewport less the bar, no grip/peek, no popup), focus on its title`,
+        full && st.sh.every((v, i) => Math.abs(v - want[i]) <= 1) && !st.grip && st.popups === 0 && st.title === 'Ashland' && st.focus === 'station-sheet-title', JSON.stringify({ full, want, ...st }));
+      check(`${vp.name}: panel modal with the bar live (<main> inert, navbar not); close button 44px top right and hittable`,
+        st.mainInert && !st.navInert && st.close[0] >= 44 && st.close[1] >= 44 && st.close[2] <= 16 && st.close[3] <= 16 && st.closeHit, JSON.stringify(st));
       await page.locator('#station-sheet .visit-photo-thumb').first().click();
       const lb = await page.waitForFunction(() => document.getElementById('lightbox').open && document.getElementById('lightbox-img').naturalWidth > 0, null, { timeout: 15000 }).then(() => true, () => false);
-      // Usable over the modal sheet: not inert, and Next steps the gallery.
+      // Usable over the modal panel: not inert, and Next steps the gallery.
       const cap0 = await page.textContent('#lightbox-caption');
       await page.click('#lightbox-next');
       await page.waitForTimeout(300);
       const lbUse = await page.evaluate((c0) => ({ inert: document.getElementById('lightbox').inert || !!document.getElementById('lightbox').closest('[inert]'), stepped: document.getElementById('lightbox-caption').textContent !== c0 }), cap0);
-      check('lightbox over the full sheet is live (not inert) and Next steps the gallery', !lbUse.inert && lbUse.stepped, JSON.stringify(lbUse));
+      check(`${vp.name}: lightbox over the panel is live (not inert) and Next steps the gallery`, lb && !lbUse.inert && lbUse.stepped, JSON.stringify({ lb, ...lbUse }));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
       const after1 = await page.evaluate(() => ({ lb: document.getElementById('lightbox').open, st: document.getElementById('station-sheet').dataset.state }));
-      check('lightbox opens from the full sheet; its Esc closes only the lightbox', lb && !after1.lb && after1.st === 'full', JSON.stringify({ lb, ...after1 }));
+      check(`${vp.name}: the lightbox's Esc closes only the lightbox`, !after1.lb && after1.st === 'full', JSON.stringify(after1));
+      // The info dialog opens over the panel too (the bar is live, so its ?
+      // button is reachable in the drawer; click it directly).
+      await page.evaluate(() => document.getElementById('btn-info').click());
+      await page.waitForTimeout(400);
+      const info = await page.evaluate(() => { const d = document.getElementById('info-modal'); return { open: d.open, inert: d.inert || !!d.closest('[inert]') }; });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const info2 = await page.evaluate(() => ({ open: document.getElementById('info-modal').open, st: document.getElementById('station-sheet').dataset.state }));
+      check(`${vp.name}: the info dialog opens over the panel, live; its Esc leaves the panel open`, info.open && !info.inert && !info2.open && info2.st === 'full', JSON.stringify({ info, info2 }));
       await page.keyboard.press('Escape');
       await page.waitForTimeout(500);
       const after = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search, inert: document.getElementById('main').inert }));
-      check('Esc closes the sheet, un-inerts <main>, drops ?station=', after.st === 'closed' && !after.inert && !/station=/.test(after.q), JSON.stringify(after));
+      check(`${vp.name}: Esc closes the panel, un-inerts <main>, drops ?station=`, after.st === 'closed' && !after.inert && !/station=/.test(after.q), JSON.stringify(after));
       await close();
+    }
+    // The bar stays live under the panel at 390: search in the bar swaps
+    // the station with the panel open, and the close button closes it.
+    {
+      const { page, close } = await open('?station=aceashla', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      await page.waitForFunction(sheetOpen, null, { timeout: 20000 });
+      await page.click('#btn-rail-search');
+      await page.waitForTimeout(400);
+      const sf = await page.evaluate(() => document.activeElement?.id);
+      await page.keyboard.type('absar');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Enter');
+      const swapped = await page.waitForFunction(() => /Absarokee/.test(document.getElementById('station-sheet-title').textContent), null, { timeout: 20000 }).then(() => true, () => false);
+      await page.waitForTimeout(400);
+      await page.click('#station-sheet [data-close-sheet]');
+      await page.waitForTimeout(500);
+      const st = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, inert: document.getElementById('main').inert, q: location.search }));
+      check('390: with the panel open the bar\'s search swaps the station; the close button closes it', sf === 'search-input' && swapped && st.st === 'closed' && !st.inert && !/station=/.test(st.q), JSON.stringify({ sf, swapped, st }));
+      await close();
+    }
+    // Dialogs from inside an open overlay (kit 1.0.0 RC 3): the info dialog
+    // opened from the ☰ drawer at 390 and 844x390 is live with focus inside,
+    // Esc closes it, and focus returns to its opener (?) in the drawer, which
+    // stays open. The lightbox opened from a thumb in the open panel returns
+    // focus to that thumb. The app closes neither overlay first.
+    for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '844x390', width: 844, height: 390, touch: true }]) {
+      const { page, close } = await open('', { ready: dataReady, viewport: vp });
+      await page.click('#btn-rail-menu');
+      await page.waitForTimeout(500);
+      // Keyboard activation: WebKit never focuses a clicked button, so a
+      // mouse click leaves the kit's opener capture (document.activeElement
+      // at open) on the drawer there; a keyboard user is on the button.
+      await page.focus('#btn-info');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(500);
+      const d = await page.evaluate(() => { const m = document.getElementById('info-modal'); return { open: m.open, modal: m.matches(':modal'), inert: m.inert || !!m.closest('[inert]'), focusIn: m.contains(document.activeElement) }; });
+      // Live: its close button takes a real click.
+      const hit = await page.evaluate(() => { const b = document.querySelector('#info-modal [data-close-modal]').getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!t && !!t.closest('#info-modal'); });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+      const a2 = await page.evaluate(() => ({ open: document.getElementById('info-modal').open, focus: document.activeElement?.id, drawer: document.getElementById('nav-drawer').classList.contains('is-open') }));
+      check(`${vp.name}: info dialog from the open ☰ drawer (Enter on ?) is live (modal, focus inside, hittable); Esc closes it, focus back on ? in the still-open drawer`,
+        d.open && d.modal && !d.inert && d.focusIn && hit && !a2.open && a2.focus === 'btn-info' && a2.drawer, JSON.stringify({ d, hit, a2 }));
+      await close();
+    }
+    for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '1440', width: 1440, height: 900 }]) {
+      const { page, close } = await open('?station=aceashla&lng=-106.14&lat=45.57&zoom=9', { ready: dataReady, viewport: vp });
+      await page.waitForSelector('#station-sheet .visit-photo-thumb', { timeout: 15000 }).catch(() => {});
+      const thumb = page.locator('#station-sheet .visit-photo-thumb').first();
+      await thumb.click();
+      const lb = await page.waitForFunction(() => document.getElementById('lightbox').open, null, { timeout: 15000 }).then(() => true, () => false);
+      const inLb = await page.evaluate(() => { const l = document.getElementById('lightbox'); return { focusIn: l.contains(document.activeElement), inert: l.inert || !!l.closest('[inert]') }; });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const back = await page.evaluate(() => ({ open: document.getElementById('lightbox').open, onThumb: document.activeElement === document.querySelector('#station-sheet .visit-photo-thumb'), st: document.getElementById('station-sheet').dataset.state }));
+      check(`${vp.name}: lightbox from the open panel is live with focus inside; Esc closes it and returns focus to the thumb, panel still open`,
+        lb && inLb.focusIn && !inLb.inert && !back.open && back.onThumb && back.st === 'full', JSON.stringify({ lb, inLb, back }));
+      await close();
+    }
+    // The legend (kit 1.0.0, MCO.initLegendDrawer): at 390 it is a "Legend"
+    // group at the end of the ☰ drawer and a Legend button sits in its
+    // bottom-left corner on the map; the button opens the drawer with the
+    // legend expanded and focus on its title, its rows still toggle, and Esc
+    // returns focus to the button. At 1440 the panel floats, no button.
+    {
+      const { page, close } = await open('?legend=collapsed', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      const a = await page.evaluate(() => {
+        const b = document.querySelector('.mco-legend-btn'), r = b && b.getBoundingClientRect(), m = document.getElementById('map').getBoundingClientRect();
+        const t = r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { btn: !!b && !b.hidden, name: b?.textContent.trim(), h: r && Math.round(r.height), inMap: !!r && r.left >= m.left && r.bottom <= m.bottom && r.left < m.left + 40,
+          hit: !!t && b.contains(t), slot: !!document.querySelector('#nav-drawer .mco-legend-slot #legend'), group: document.querySelector('#nav-drawer .mco-legend-slot')?.getAttribute('aria-label') };
+      });
+      await page.click('.mco-legend-btn');
+      await page.waitForTimeout(500);
+      const o = await page.evaluate(() => ({ open: document.getElementById('nav-drawer').classList.contains('is-open'), focus: document.activeElement?.id,
+        expanded: document.getElementById('legend-toggle-btn').getAttribute('aria-expanded'), rowShown: document.querySelector('#legend-rows [data-key="as_needed"]')?.checkVisibility() }));
+      await page.locator('#legend-rows [data-key="as_needed"]').click();
+      await page.waitForTimeout(400);
+      const t = await page.evaluate(() => ({ pressed: document.querySelector('#legend-rows [data-key="as_needed"]').getAttribute('aria-pressed'), q: location.search }));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      const c = await page.evaluate(() => ({ open: document.getElementById('nav-drawer').classList.contains('is-open'), focusBtn: document.activeElement?.classList.contains('mco-legend-btn') }));
+      check('390: legend in a "Legend" drawer group; the Legend button (>= 40px, on the map, hittable) opens it expanded with focus on its title; rows toggle; Esc -> button',
+        a.btn && a.name === 'Legend' && a.h >= 40 && a.inMap && a.hit && a.slot && a.group === 'Legend' && o.open && o.focus === 'legend-title' && o.expanded === 'true' && o.rowShown
+          && t.pressed === 'false' && /cat-compliance=/.test(t.q) && !c.open && c.focusBtn, JSON.stringify({ a, o, t, c }));
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.waitForTimeout(600);
+      const d = await page.evaluate(() => { const l = document.getElementById('legend'), m = document.getElementById('map').getBoundingClientRect(), r = l.getBoundingClientRect();
+        return { floating: !l.classList.contains('is-in-drawer') && !!l.closest('#map-container'), inMap: r.left >= m.left && r.bottom <= m.bottom, btnHidden: document.querySelector('.mco-legend-btn').hidden }; });
+      check('1440: the legend floats over the map again (no Legend button)', d.floating && d.inMap && d.btnHidden, JSON.stringify(d));
+      await close();
+    }
+    // Touch tablet (768x1024, legend floating): the legend sits clear above
+    // the 44px two-line attribution; at 1440 with a mouse it keeps its 36px
+    // bottom inset.
+    for (const vp of [{ name: '768x1024 touch', width: 768, height: 1024, touch: true }, { name: '1440 mouse', width: 1440, height: 900 }]) {
+      const { page, close } = await open('?legend=open', { ready: dataReady, viewport: vp, settleMs: 1000 });
+      const g = await page.evaluate(() => {
+        const R = (el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); };
+        const l = R(document.getElementById('legend')), a = R(document.querySelector('#map .maplibregl-ctrl-attrib')), m = R(document.getElementById('map'));
+        const ox = Math.min(l[2], a[2]) - Math.max(l[0], a[0]), oy = Math.min(l[3], a[3]) - Math.max(l[1], a[1]);
+        return { legend: l, attrib: a, overlap: ox > 0 && oy > 0 ? [ox, oy] : null, bottomInset: m[3] - l[3] };
+      });
+      const ok = vp.touch ? !g.overlap : g.bottomInset === 36;
+      check(`${vp.name}: legend ${g.legend.join(',')} vs attribution ${g.attrib.join(',')} — ${vp.touch ? 'no overlap' : 'bottom inset 36px (unchanged)'}`, ok, JSON.stringify(g));
+      await close();
+    }
+    // The bar never grows past one row while the sub-network chips arrive
+    // from the live API (seconds after load): sample its height every 100ms
+    // from 1s after navigation until the chips have been in for 2s (or 12s).
+    // A ResizeObserver also records every height the bar takes, so a change
+    // between samples (timers run late while MapLibre loads) is caught too.
+    for (const vp of [{ width: 390, height: 844 }, { width: 980, height: 1700 }]) {
+      const ctx = await env.browser.newContext({ viewport: vp, hasTouch: true, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => {
+        try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {}
+        window.__barSamples = [];
+        window.__barMaxRO = 0;
+        const t0 = performance.now();
+        new MutationObserver((_, mo) => {
+          const n = document.getElementById('navbar');
+          if (!n) return;
+          mo.disconnect();
+          new ResizeObserver(() => { if (performance.now() - t0 >= 1000) window.__barMaxRO = Math.max(window.__barMaxRO, Math.round(n.getBoundingClientRect().height)); }).observe(n);
+        }).observe(document, { childList: true, subtree: true });
+        setInterval(() => {
+          const n = document.getElementById('navbar');
+          if (!n || performance.now() - t0 < 1000) return;
+          window.__barSamples.push([Math.round(performance.now() - t0), Math.round(n.getBoundingClientRect().height), document.querySelectorAll('#subnet-filters .mco-chip').length]);
+        }, 100);
+      });
+      const page = await ctx.newPage();
+      const resp = await page.goto(env.base);
+      check(`${vp.width}x${vp.height} sampler: page served (${resp ? resp.status() : 'no response'})`, !!resp && resp.status() === 200);
+      const chips = await page.waitForFunction(() => document.querySelectorAll('#subnet-filters .mco-chip').length > 0, null, { timeout: 12000 }).then(() => true, () => false);
+      // Keep sampling until a sample lands 2s after the chips (timers can run
+      // late under load, so wait on the samples, not the clock).
+      await page.waitForFunction(() => { const s = window.__barSamples, f = s.find((x) => x[2] > 0); return !!f && s[s.length - 1][0] >= f[0] + 2000; }, null, { timeout: 15000 }).catch(() => {});
+      const { s, ro } = await page.evaluate(() => ({ s: window.__barSamples, ro: window.__barMaxRO }));
+      const max = Math.max(...s.map((x) => x[1]), ro);
+      const firstChip = s.find((x) => x[2] > 0);
+      const after = firstChip ? s.filter((x) => x[0] > firstChip[0]).length : 0;
+      check(`${vp.width}x${vp.height} touch: bar <= 64px at every 100ms sample after 1s while the chips arrive (${s.length} samples, ${after} after the chips; max ${max}px incl. ResizeObserver; chips at ${firstChip ? firstChip[0] : '-'}ms)`,
+        chips && s.length >= 10 && after >= 5 && max <= 64, JSON.stringify({ chips, n: s.length, after, max, ro, firstChip, last: s[s.length - 1] }));
+      await ctx.close();
     }
     // Drill-down history: opening a station pushes ONE entry; Back closes it,
     // Forward reopens it; Esc on a pushed station steps back over its entry.
@@ -346,8 +552,8 @@ export default {
       check('no console / CSP problems with a sheet + lightbox open', probs.length === 0, probs.slice(0, 3).join(' | '));
       await close();
     }
-    // Kit 0.21.0 conformance. ?station= (no camera) opens the sheet at 1440
-    // (end-docked) and at 390 (bottom sheet), never an anchored popup. Once
+    // Kit 0.21.0 conformance. ?station= (no camera) opens the panel at 1440
+    // (end-docked) and at 390 (full height), never an anchored popup. Once
     // closed, a manual Refresh must not re-open it (_initStationConsumed).
     for (const vp of [{ name: '1440', width: 1440, height: 900 }, { name: '390', width: 390, height: 844, touch: true }]) {
       const { page, close } = await open('?station=aceabsar', { ready: dataReady, viewport: vp });

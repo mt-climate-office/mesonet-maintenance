@@ -20,9 +20,9 @@ Other features:
 
 - **HydroMet / AgriMet** sub-network chips with live counts.
 - **Search box** with a themed dropdown, keyboard navigation (`↑` `↓` `Enter`), and a `/` global shortcut (`?kbd=off` disables it).
-- **Interactive legend** — click a row to hide that category; double-click (or <kbd>Shift</kbd>+<kbd>Enter</kbd>) to isolate it.
+- **Interactive legend** — click a row to hide that category; double-click (or <kbd>Shift</kbd>+<kbd>Enter</kbd>) to isolate it. On a phone it is a group in the ☰ menu, opened by a Legend button on the map.
 - **Co-located sites** show a count badge and fan out on hover or tap; click a foot for that station (the kit's `MCO.map.colocation`). The station panel lists the others under "Also at this site".
-- **Station panel** (the kit's sheet: docked at the side on desktop, a bottom sheet on a phone) with the full visit history — dates, crew, trip types, tasks, sensors added/removed, and visit photos in a gallery + lightbox — plus a dashboard link.
+- **Station panel** (the kit's sheet: docked at the side on desktop and tablet, full height under the bar on a phone, closed with its × button, <kbd>Esc</kbd> or Back) with the full visit history — dates, crew, trip types, tasks, sensors added/removed, and visit photos in a gallery + lightbox — plus a dashboard link.
 - **Toggleable station-ID labels** with collision dodging.
 - **Tribal lands** and **Montana outline** overlays; hillshade relief.
 - **Light / dark / high-contrast** themes on neutral [CARTO](https://carto.com/basemaps) basemaps; honors `prefers-reduced-motion` and `prefers-color-scheme`.
