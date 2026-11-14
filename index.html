@@ -554,43 +554,48 @@
     <div class="info-modal-header">
       <div>
         <h2 class="info-modal-title" id="info-modal-title">Mesonet Station Maintenance</h2>
-        <div class="info-modal-subtitle">Maintenance visits across the Montana Mesonet network</div>
       </div>
       <button type="button" class="modal-close" aria-label="Close" data-close-modal>×</button>
     </div>
 
     <div class="info-section">
       <h3>What this shows</h3>
-      <p>Only <strong>HydroMet</strong> stations require a <strong>Maintenance</strong> visit at least once per calendar year (a Repair visit does not count). The effective date of a visit is its <strong>Visit Date</strong>. Three color modes, chosen in the bar:</p>
+      <p>Maintenance visits to Montana Mesonet stations. HydroMet stations need a Maintenance visit each calendar year, and Repairs do not count.</p>
       <ul>
-        <li><strong>Compliance</strong>: HydroMet stations visited this year, and those overdue. Stations <strong>installed this year</strong> are exempt. <strong>AgriMet</strong> stations are visited <strong>as needed</strong>, so they are never marked overdue.</li>
-        <li><strong>Time since</strong>: how long since the last Maintenance visit, for every network. An empty (unfilled) dot has never had one.</li>
-        <li><strong>Trip type</strong>: the type of the most recent completed visit.</li>
+        <li><strong>Time since:</strong> since the last Maintenance visit. A hollow dot has none.</li>
+        <li><strong>Trip type:</strong> the most recent visit’s type.</li>
       </ul>
-      <p>The legend names each color. On a phone it is in the menu (☰); the Legend button on the map opens it there.</p>
+      <p>A numbered dot is several stations at one site.</p>
+      <details>
+        <summary>How visits are counted</summary>
+        <ul>
+          <li>A visit counts on its Visit Date in the maintenance log.</li>
+          <li>Stations installed this year are exempt until next year.</li>
+          <li>AgriMet stations are visited as needed and are never overdue.</li>
+          <li>Time since counts only Maintenance visits.</li>
+        </ul>
+      </details>
     </div>
 
     <div class="info-section">
       <h3>How to use it</h3>
       <ul>
-        <li><strong>Search</strong>: press <kbd>/</kbd> to jump there; <kbd>↑</kbd>/<kbd>↓</kbd> + <kbd>Enter</kbd> to pick.</li>
-        <li><strong>Networks</strong>: the chips show or hide HydroMet and AgriMet.</li>
-        <li><strong>Legend</strong>: click a row to hide a category; double-click (or <kbd>Shift</kbd>+<kbd>Enter</kbd>) to isolate.</li>
-        <li><strong>Hover</strong> a dot for its status; <strong>click</strong> it for the visit history and a dashboard link, in the station panel.</li>
-        <li><strong>Numbered dots</strong>: more than one station shares that location. Hover or tap to fan them out, and click one for its details. The station panel lists the others under “Also at this site”.</li>
-        <li><kbd>Esc</kbd> closes the fan-out or the station panel.</li>
-        <li>Using speech input? Add <code>?kbd=off</code> to the address to turn off the <kbd>/</kbd> shortcut.</li>
+        <li>Pick a color mode in the bar.</li>
+        <li>Tap a station for its visits and photos.</li>
+        <li>Tap a legend row to hide that category. Double-tap to show only it.</li>
+        <li>Use <strong>HydroMet</strong> and <strong>AgriMet</strong> to show or hide a network.</li>
+        <li>Keys: <kbd>/</kbd> search, <kbd>←</kbd> <kbd>→</kbd> step photos, <kbd>Esc</kbd> close. Add <code>?kbd=off</code> to the address to turn off <kbd>/</kbd>.</li>
       </ul>
     </div>
 
     <div class="info-section">
       <h3>Share or bookmark</h3>
-      <p>The URL reflects every choice, so copy it from the address bar. <code>?station=&lt;id&gt;</code> opens a single station, and Back closes it.</p>
+      <p>The address holds this view. Copy it to share.</p>
     </div>
 
     <div class="info-section">
       <h3>Data</h3>
-      <p>Station locations from the Montana Mesonet station list, and visit records from the Mesonet maintenance log, both through the Mesonet API (<code>mesonet2.climate.umt.edu</code>). The visit records are read live, so the stamp in the bar is the time they were loaded.</p>
+      <p><a href="https://mesonet2.climate.umt.edu/api/v2/docs" target="_blank" rel="noopener noreferrer">Montana Mesonet API</a>. Visits are up to 5 minutes old.</p>
       <p id="info-credit"></p>
     </div>
   </div>
