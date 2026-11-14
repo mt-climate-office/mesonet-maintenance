@@ -30,7 +30,7 @@
   const DASH_URL     = (s) => `${MESONET_ORIGIN}/dash/?s=${encodeURIComponent(s)}`;
   // The help's API docs link, set here so the host lives in one place.
   const apiDocsLink = document.getElementById('api-docs-link');
-  if (apiDocsLink) apiDocsLink.href = `${API_BASE}/docs`;
+  if (apiDocsLink) Object.assign(apiDocsLink, { href: `${API_BASE}/docs`, target: '_blank', rel: 'noopener noreferrer' });
 
 
   const SEARCH_FLY_ZOOM         = 11;     // zoom when search/deep-link flies to a station
