@@ -594,6 +594,19 @@ export default {
         JSON.stringify({ closed, after }));
       await close();
     }
+    // A phone keyboard turns 390x844 into a short landscape viewport. While
+    // the search field has focus the kit holds the folded bar, and the bar's
+    // mode select must stay with it.
+    {
+      const { page, close } = await open('', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      await page.click('#btn-rail-search');
+      await page.waitForTimeout(500);
+      await page.setViewportSize({ width: 390, height: 374 });
+      await page.waitForTimeout(800);
+      const k = await page.evaluate(() => ({ hold: document.documentElement.classList.contains('mco-bar-hold'), active: document.activeElement?.id, select: getComputedStyle(document.getElementById('rail-mode-select')).display }));
+      check('390 keyboard up while typing: the held bar keeps its mode select', k.hold && k.active === 'search-input' && k.select !== 'none', JSON.stringify(k));
+      await close();
+    }
     // 390: the one-row phone bar (badge left, mode select, search, ☰ right),
     // the right drawer with the drawer contract, Back closing a sheet opened
     // from search, and the hot control mirroring the drawer's mode control.
