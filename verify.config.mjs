@@ -131,7 +131,7 @@ export default {
         const t = document.getElementById('tooltip');
         return { vis: t.classList.contains('visible'), text: t.textContent, cursor: document.querySelector('.maplibregl-canvas').style.cursor };
       });
-      check('hovering a dot shows the tooltip (name, id, status) and a pointer', !!dot && tip.vis && /Visited this year/.test(tip.text) && tip.cursor === 'pointer', JSON.stringify(tip));
+      check('hovering a dot shows the tooltip (name, id, status) and a pointer', !!dot && tip.vis && /Visited this year/.test(tip.text) && /Last Maintenance/.test(tip.text) && tip.cursor === 'pointer', JSON.stringify(tip));
       const probs = await problems();
       check('no console / CSP problems on load', probs.length === 0, probs.slice(0, 3).join(' | '));
       // A theme flip calls setStyle, which wipes custom layers: they must

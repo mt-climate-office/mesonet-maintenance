@@ -1443,7 +1443,7 @@
     const pill = STATE_PILL[complianceStateFor(s)] || STATE_PILL.overdue;
     const line = [pill.lbl];
     if (!dataUnavailable && m && m.last_qualifying_visit_date) {
-      line.push(`last Maint./Repair ${relDays(m.last_qualifying_visit_date)}`);
+      line.push(`Last Maintenance ${relDays(m.last_qualifying_visit_date)}`);
     }
     return { name: s.name || stationId, sub: s.station, line };
   }
