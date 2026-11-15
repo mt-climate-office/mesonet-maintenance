@@ -186,6 +186,19 @@ export default {
       }
       await ctx.close();
     }
+    // Station list down: the notice names the station list, and the stamp
+    // does not stay on "loading…". Chromium only, for the same reason.
+    if (env.engine === 'chromium') {
+      const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
+      await ctx.route(/\/api\/v2\/stations\/\?type=json/, (r) => r.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: 'stub' }));
+      const page = await ctx.newPage();
+      await page.goto(env.base);
+      await page.waitForSelector('#data-banner', { timeout: 45000 }).catch(() => {});
+      const st = await page.evaluate(() => ({ text: document.getElementById('data-banner')?.textContent || '', stamp: document.getElementById('refresh-stamp').textContent }));
+      check('station list down: notice names the station list, stamp not "loading…"', /Station list unavailable/.test(st.text) && !/Maintenance/.test(st.text) && st.stamp !== 'loading…', JSON.stringify(st));
+      await ctx.close();
+    }
     // Theme toggle cycles dark -> light -> high contrast -> dark, naming the
     // next theme; the map repaints its data in high contrast.
     {

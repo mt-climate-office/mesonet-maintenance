@@ -673,6 +673,8 @@
   // ── Data fetch ───────────────────────────────────────────────────────────
   // Maintenance data changes slowly: load once on map load (or via manual
   // Refresh). Fetch BOTH endpoints, then JOIN by station slug.
+  // When the last successful load landed, for the stamp after a failed one.
+  let _loadedAt = null;
   async function loadAll() {
     try {
       // The maintenance feed is optional — the map still works as a station
@@ -695,7 +697,8 @@
       rebuildSource();
       applyAllFilters();   // re-apply now that activeNetworks is populated
       renderLegend();
-      refreshStamp(Date.now());
+      _loadedAt = Date.now();
+      refreshStamp(_loadedAt);
       // Deep-link from ?station=… in URL, on the FIRST load only: a manual
       // Refresh must not re-open a station the visitor has since closed.
       // loadAll() is only called from the map's 'load' handler (and
@@ -724,7 +727,12 @@
     } catch (err) {
       console.error(err);
       dataUnavailable = true;
-      setDataNotice(true);
+      // A failed Refresh keeps the stations it already had.
+      setDataNotice(true, stations.length
+        ? 'Station list unavailable. Showing the last list loaded, without visit status.'
+        : 'Station list unavailable.');
+      if (_loadedAt) refreshStamp(_loadedAt);
+      else refreshStampEl.textContent = 'data unavailable';
       MCO.showToast(`Error loading data: ${err.message}`);
       // Still try to render whatever we have.
       indexStations();
@@ -739,18 +747,21 @@
   }
   // Maintenance feed down or empty: a warning notice over the map, with
   // Retry (MCO.notice, kit 0.8.0 — tone word, icon, announcement, dismiss).
+  // The station list down shows the same notice with its own text.
   // The element keeps the id "data-banner": scripts/generate_preview.py
   // refuses to overwrite the social card while it is visible.
   let _dataNotice = null;
-  function setDataNotice(on) {
+  function setDataNotice(on, text = 'Maintenance data unavailable. Showing stations without visit status.') {
+    if (on && _dataNotice && _dataNotice.text !== text) setDataNotice(false);
     if (on && !_dataNotice) {
       _dataNotice = MCO.notice({
         tone: 'warning',
-        text: 'Maintenance data unavailable. Showing stations without visit status.',
+        text,
         action: { label: 'Retry', onClick: () => refreshData() },
         container: mapContainerEl, place: 'over',
         onClose: () => { _dataNotice = null; },
       });
+      _dataNotice.text = text;
       if (_dataNotice.element) _dataNotice.element.id = 'data-banner';
     } else if (!on && _dataNotice) {
       const n = _dataNotice;
