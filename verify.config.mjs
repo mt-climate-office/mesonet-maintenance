@@ -186,17 +186,23 @@ export default {
       }
       await ctx.close();
     }
-    // Station list down: the notice names the station list, and the stamp
-    // does not stay on "loading…". Chromium only, for the same reason.
+    // Station list down: the notice says so and the stamp does not stay on
+    // "loading…"; Retry loads the list and clears the notice. Chromium only,
+    // for the same reason.
     if (env.engine === 'chromium') {
       const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
       await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
-      await ctx.route(/\/api\/v2\/stations\/\?type=json/, (r) => r.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: 'stub' }));
+      let n = 0;
+      await ctx.route(/\/api\/v2\/stations\/\?type=json/, (r) => (n++ ? r.continue() : r.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: 'stub' })));
       const page = await ctx.newPage();
       await page.goto(env.base);
       await page.waitForSelector('#data-banner', { timeout: 45000 }).catch(() => {});
-      const st = await page.evaluate(() => ({ text: document.getElementById('data-banner')?.textContent || '', stamp: document.getElementById('refresh-stamp').textContent }));
-      check('station list down: notice names the station list, stamp not "loading…"', /Station list unavailable/.test(st.text) && !/Maintenance/.test(st.text) && st.stamp !== 'loading…', JSON.stringify(st));
+      const st = await page.evaluate(() => ({ text: document.querySelector('#data-banner .mco-notice-text')?.textContent || '', stamp: document.getElementById('refresh-stamp').textContent }));
+      check('station list down: notice "Station data failed to load.", stamp "Data unavailable"', st.text === 'Warning Station data failed to load.' && st.stamp === 'Data unavailable', JSON.stringify(st));
+      await page.click('#data-banner button:text("Retry")').catch(() => {});
+      await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
+      const re = await page.evaluate(() => ({ rows: document.querySelectorAll('#sr-station-table tbody tr').length, banner: !!document.getElementById('data-banner'), stamp: document.getElementById('refresh-stamp').textContent }));
+      check('station list down: Retry loads the list and clears the notice', re.rows > 100 && !re.banner && /^Updated /.test(re.stamp), JSON.stringify(re));
       await ctx.close();
     }
     // Theme toggle cycles dark -> light -> high contrast -> dark, naming the

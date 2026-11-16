@@ -675,7 +675,11 @@
   // Refresh). Fetch BOTH endpoints, then JOIN by station slug.
   // When the last successful load landed, for the stamp after a failed one.
   let _loadedAt = null;
+  // One load at a time: Retry and Refresh cannot overlap a load in flight.
+  let _loading = false;
   async function loadAll() {
+    if (_loading) return;
+    _loading = true;
     try {
       // The maintenance feed is optional — the map still works as a station
       // map without it, so a failure there degrades to the banner rather than
@@ -729,10 +733,10 @@
       dataUnavailable = true;
       // A failed Refresh keeps the stations it already had.
       setDataNotice(true, stations.length
-        ? 'Station list unavailable. Showing the last list loaded, without visit status.'
-        : 'Station list unavailable.');
+        ? 'Station data failed to load. Showing the last list loaded, without visit status.'
+        : 'Station data failed to load.');
       if (_loadedAt) refreshStamp(_loadedAt);
-      else refreshStampEl.textContent = 'data unavailable';
+      else refreshStampEl.textContent = 'Data unavailable';
       MCO.showToast(`Error loading data: ${err.message}`);
       // Still try to render whatever we have.
       indexStations();
@@ -743,6 +747,8 @@
       renderLegend();
       if (!_initStationConsumed) { _initStationConsumed = true; infoModalCtl.intro(); }
       MCO.ready();
+    } finally {
+      _loading = false;
     }
   }
   // Maintenance feed down or empty: a warning notice over the map, with
