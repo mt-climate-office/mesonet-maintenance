@@ -372,18 +372,22 @@ export default {
       check('390: with the panel open the bar\'s search swaps the station; the close button closes it', sf === 'search-input' && swapped && st.st === 'closed' && !st.inert && !/station=/.test(st.q), JSON.stringify({ sf, swapped, st }));
       await close();
     }
-    // Dialogs from inside an open overlay (kit 1.0.0 RC 3): the info dialog
-    // opened from the ☰ drawer at 390 and 844x390 is live with focus inside,
-    // Esc closes it, and focus returns to its opener (?) in the drawer, which
-    // stays open. The lightbox opened from a thumb in the open panel returns
-    // focus to that thumb. The app closes neither overlay first.
-    for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '844x390', width: 844, height: 390, touch: true }]) {
+    // The help dialog from wherever the kit puts the Help button: the ☰
+    // drawer's "Page tools" row at 320 (opened from inside the open drawer,
+    // which stays open), the bar at 390, the rail at 844x390. It is live with
+    // focus inside, Esc closes it, and focus returns to Help. The lightbox
+    // opened from a thumb in the open panel returns focus to that thumb. The
+    // app closes neither overlay first.
+    for (const vp of [{ name: '320x568', width: 320, height: 568, touch: true, row: true }, { name: '390x844', width: 390, height: 844, touch: true, row: false }, { name: '844x390', width: 844, height: 390, touch: true, row: false }]) {
       const { page, close } = await open('', { ready: dataReady, viewport: vp });
-      await page.click('#btn-rail-menu');
-      await page.waitForTimeout(500);
+      const at = await page.evaluate(() => ({ tools: document.getElementById('navbar').dataset.tools, row: !!document.getElementById('btn-info').closest('.mco-drawer-tools'), name: document.getElementById('btn-info').getAttribute('aria-label') }));
+      if (at.row) {
+        await page.click('#btn-rail-menu');
+        await page.waitForTimeout(500);
+      }
       // Keyboard activation: WebKit never focuses a clicked button, so a
       // mouse click leaves the kit's opener capture (document.activeElement
-      // at open) on the drawer there; a keyboard user is on the button.
+      // at open) off the button there; a keyboard user is on it.
       await page.focus('#btn-info');
       await page.keyboard.press('Enter');
       await page.waitForTimeout(500);
@@ -393,8 +397,8 @@ export default {
       await page.keyboard.press('Escape');
       await page.waitForTimeout(500);
       const a2 = await page.evaluate(() => ({ open: document.getElementById('info-modal').open, focus: document.activeElement?.id, drawer: document.getElementById('nav-drawer').classList.contains('is-open') }));
-      check(`${vp.name}: info dialog from the open ☰ drawer (Enter on ?) is live (modal, focus inside, hittable); Esc closes it, focus back on ? in the still-open drawer`,
-        d.open && d.modal && !d.inert && d.focusIn && hit && !a2.open && a2.focus === 'btn-info' && a2.drawer, JSON.stringify({ d, hit, a2 }));
+      check(`${vp.name}: Help (${vp.row ? 'in the open ☰ drawer\'s Page tools row' : 'in the bar'}, Enter) opens a live dialog (modal, focus inside, hittable); Esc closes it, focus back on Help${vp.row ? ', drawer still open' : ''}`,
+        !!at.tools && at.row === vp.row && at.name === 'Help' && d.open && d.modal && !d.inert && d.focusIn && hit && !a2.open && a2.focus === 'btn-info' && a2.drawer === at.row, JSON.stringify({ at, d, hit, a2 }));
       await close();
     }
     for (const vp of [{ name: '390x844', width: 390, height: 844, touch: true }, { name: '1440', width: 1440, height: 900 }]) {

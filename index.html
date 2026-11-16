@@ -43,9 +43,9 @@
   <!-- Favicons / app icons: hot-linked from the pinned kit tag (kit 0.9.0,
        decided 2026-10-08) so they version with the kit. img-src allows
        cdn.jsdelivr.net for them. The navbar logo stays vendored. -->
-  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/assets/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/assets/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/assets/apple-touch-icon.png">
 
   <!-- Open Graph (Facebook, LinkedIn, Slack, Discord, iMessage, etc.) -->
   <meta property="og:type"             content="website">
@@ -101,8 +101,8 @@
   <!-- House fonts: kit-hosted (mco-web-style 0.7.0), declared in mco-theme.css.
        Preloaded so the first frame is already in Outfit — no system-font flash.
        Same @version as the theme CSS; crossorigin is required on font preloads. -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/fonts/space-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
   <!-- MapLibre GL 6 (kit 0.8.0+): ES modules only, imported on demand by
        MCO.map.loadMapLibre(). The import map carries the SRI hashes and is ONE
        LINE, byte for byte from the kit snippet, so its CSP sha256 holds. -->
@@ -117,11 +117,11 @@
         integrity="sha384-ntw3zEt6rcVML7jDK0ULmHa5hxLB23afsPqzqfY+gLgMfAkbFCnCgPpkZvV5mmZX"
         crossorigin="anonymous">
 
-  <!-- mco-web-style @1.0.0 — tokens, reset, a11y utilities, navbar/panel/toast/
+  <!-- mco-web-style @1.1.0 — tokens, reset, a11y utilities, navbar/panel/toast/
        tooltip/modal shells, MapLibre control polish. Everything below in
        <style> is what remains app-specific after the kit took the rest. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/theme/mco-theme.css"
-        integrity="sha384-sYr4fDiezV2VCn92FyWqmM9kKbbJPMUCqf7xIkQqLyFlSbMmWCTGdAzNPlm6cJ65"
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/theme/mco-theme.css"
+        integrity="sha384-WX2ClnLE7X3vkRXzHEfUIeqRxuvM5OcSUVWmdbZQiFdqo+OaAyb2+GZexTcjrYJz"
         crossorigin="anonymous">
 
   <style>
@@ -473,9 +473,15 @@
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
       </svg>
     </button>
+  </div>
+  </div><!-- /.mco-nav-drawer -->
+  <!-- The page's own buttons, last in the bar (.mco-bar-tools). The kit keeps
+       them in the bar while they fit and moves theme to the top of the
+       drawer when they do not. Each word is part of its name. -->
+  <div class="mco-bar-tools" role="group" aria-label="Page tools">
     <!-- 3-state theme toggle (kit 0.10.0, cycle): dark -> light -> high
          contrast. The icon and aria-label show the NEXT theme. -->
-    <button type="button" class="nav-btn icon-only" id="btn-theme" title="Switch theme" aria-label="Switch theme">
+    <button type="button" class="nav-btn" id="btn-theme" title="Switch theme" aria-label="Switch theme">
       <svg id="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -494,10 +500,12 @@
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none">
         <circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>
       </svg>
+      <span class="btn-label">Theme</span>
     </button>
-    <button type="button" class="nav-btn mco-btn-info" id="btn-info" aria-label="About this map">?</button>
+    <button type="button" class="nav-btn mco-btn-info" id="btn-info" aria-label="Help">
+      <span aria-hidden="true">?</span><span class="btn-label">Help</span>
+    </button>
   </div>
-  </div><!-- /.mco-nav-drawer -->
 </header>
 <div class="mco-scrim" id="rail-scrim" aria-hidden="true" hidden></div>
 
@@ -618,19 +626,19 @@
   <div class="lightbox-caption" id="lightbox-caption"></div>
 </dialog>
 
-<!-- mco-web-style @1.0.0 — classic scripts, so they must precede app.js.
+<!-- mco-web-style @1.1.0 — classic scripts, so they must precede app.js.
      MapLibre is not among them: mco-map.js imports it on demand
      (MCO.map.loadMapLibre). mco-palette.js precedes mco-map.js, whose
      markerPaint() reads it. SRI hashes are the kit README's table for this
      exact tag; bumping @version without recomputing them hard-fails in the
      browser, which is the point. -->
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/core/mco-core.js"
-        integrity="sha384-D7xlWfDfWcrBYM29SxNSZ9sjoFbu9VmboXzztcMMqsSm10bhGta1w4i7Q/mveU3A"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/core/mco-core.js"
+        integrity="sha384-Y0+6TDc0xyv3bq3FQBaH3f/wjp9D9Ce76Fe5HuZS35+gGTBm9asV5Ar4CsHm8TyW"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/palette/mco-palette.js"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/palette/mco-palette.js"
         integrity="sha384-bMyfpU5iEKAQiHDJZLqmCMt3sTGm+HBi2GIY7I9xLyV+JYrbGgHOX9+/XVXy8CYV"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.0.0/map/mco-map.js"
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@1.1.0/map/mco-map.js"
         integrity="sha384-eWrG2T3udOw4ET+hy7Sq0BR/c4jCKD2+Cy4TEV2m4Dd6BL5VXGZXS2n8B8y+8v4z"
         crossorigin="anonymous"></script>
 

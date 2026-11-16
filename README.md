@@ -59,5 +59,5 @@ node tools/verify/keyboard.mjs   --config ../mesonet-maintenance/verify.config.m
 
 ## Kit
 
-mco-web-style 1.0.0.
+mco-web-style 1.1.0.
 Design rules: mco-web-style/HOUSE-STYLE.md
