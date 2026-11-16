@@ -197,8 +197,8 @@ export default {
       const page = await ctx.newPage();
       await page.goto(env.base);
       await page.waitForSelector('#data-banner', { timeout: 45000 }).catch(() => {});
-      const st = await page.evaluate(() => ({ text: document.querySelector('#data-banner .mco-notice-text')?.textContent || '', stamp: document.getElementById('refresh-stamp').textContent }));
-      check('station list down: notice "Station data failed to load.", stamp "Data unavailable"', st.text === 'Warning Station data failed to load.' && st.stamp === 'Data unavailable', JSON.stringify(st));
+      const st = await page.evaluate(() => ({ text: document.querySelector('#data-banner .mco-notice-text')?.textContent || '', toast: document.querySelector('.mco-toast')?.textContent || '', stamp: document.getElementById('refresh-stamp').textContent }));
+      check('station list down: error notice "Station data failed to load.", no toast, stamp "Data unavailable"', st.text === 'Error Station data failed to load.' && !st.toast && st.stamp === 'Data unavailable', JSON.stringify(st));
       await page.click('#data-banner button:text("Retry")').catch(() => {});
       await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
       const re = await page.evaluate(() => ({ rows: document.querySelectorAll('#sr-station-table tbody tr').length, banner: !!document.getElementById('data-banner'), stamp: document.getElementById('refresh-stamp').textContent }));

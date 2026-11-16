@@ -731,13 +731,12 @@
     } catch (err) {
       console.error(err);
       dataUnavailable = true;
-      // A failed Refresh keeps the stations it already had.
-      setDataNotice(true, stations.length
-        ? 'Station data failed to load. Showing the last list loaded, without visit status.'
-        : 'Station data failed to load.');
+      // A failed Refresh keeps the stations it already had: a warning. With
+      // no stations to show it is an error.
+      if (stations.length) setDataNotice(true, 'Station data failed to load. Showing the last list loaded, without visit status.');
+      else setDataNotice(true, 'Station data failed to load.', 'danger');
       if (_loadedAt) refreshStamp(_loadedAt);
       else refreshStampEl.textContent = 'Data unavailable';
-      MCO.showToast(`Error loading data: ${err.message}`);
       // Still try to render whatever we have.
       indexStations();
       buildFilterUI();
@@ -757,11 +756,11 @@
   // The element keeps the id "data-banner": scripts/generate_preview.py
   // refuses to overwrite the social card while it is visible.
   let _dataNotice = null;
-  function setDataNotice(on, text = 'Maintenance data unavailable. Showing stations without visit status.') {
+  function setDataNotice(on, text = 'Maintenance data unavailable. Showing stations without visit status.', tone = 'warning') {
     if (on && _dataNotice && _dataNotice.text !== text) setDataNotice(false);
     if (on && !_dataNotice) {
       _dataNotice = MCO.notice({
-        tone: 'warning',
+        tone,
         text,
         action: { label: 'Retry', onClick: () => refreshData() },
         container: mapContainerEl, place: 'over',
