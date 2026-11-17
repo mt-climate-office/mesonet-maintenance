@@ -1243,9 +1243,12 @@
     const frag = MCO.map.popupContent({
       title: null,
       subtitle: `${stationId}${s.sub_network ? ` · ${s.sub_network}` : ''}`,
-      actions: [{ label: 'Open dashboard →', href: DASH_URL(stationId) }],
+      actions: [{ label: 'Open dashboard', href: DASH_URL(stationId) }],
     });
     const root = frag.querySelector('.mco-popup');
+    // The link's name says which station; its text stays short.
+    const dash = root.querySelector('.mco-popup-actions a');
+    if (dash) dash.setAttribute('aria-label', `Open dashboard for ${s.name || stationId}`);
     root.insertBefore(stationBodyEl(stationId), root.querySelector('.mco-popup-actions'));
     return frag;
   }

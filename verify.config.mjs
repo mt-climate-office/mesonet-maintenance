@@ -562,12 +562,14 @@ export default {
         title: document.getElementById('station-sheet-title').textContent,
         popups: document.querySelectorAll('.maplibregl-popup').length,
         also: /Also at this site/.test(document.getElementById('station-sheet').textContent),
+        dash: [...document.querySelectorAll('#station-sheet .mco-popup-actions a')].map((x) => x.textContent).join('|'),
+        dashName: document.querySelector('#station-sheet .mco-popup-actions a')?.getAttribute('aria-label'),
         right: Math.round(document.getElementById('station-sheet').getBoundingClientRect().right),
         bottom: Math.round(document.getElementById('station-sheet').getBoundingClientRect().bottom),
         q: location.search,
       }));
-      check(`${vp.name}: ?station=aceabsar opens the sheet (Absarokee, "Also at this site", no popup)`,
-        opened && st.title === 'Absarokee' && st.popups === 0 && st.also && /station=aceabsar/.test(st.q), JSON.stringify(st));
+      check(`${vp.name}: ?station=aceabsar opens the sheet (Absarokee, "Also at this site", "Open dashboard" named for the station, no popup)`,
+        opened && st.title === 'Absarokee' && st.popups === 0 && st.also && st.dash === 'Open dashboard' && st.dashName === 'Open dashboard for Absarokee' && /station=aceabsar/.test(st.q), JSON.stringify(st));
       await page.click('#station-sheet [data-close-sheet]');
       await page.waitForTimeout(600);
       const closed = await page.evaluate(() => ({ st: document.getElementById('station-sheet').dataset.state, q: location.search }));
