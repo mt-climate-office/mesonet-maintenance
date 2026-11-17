@@ -673,7 +673,13 @@
   // ── Data fetch ───────────────────────────────────────────────────────────
   // Maintenance data changes slowly: load once on map load (or via manual
   // Refresh). Fetch BOTH endpoints, then JOIN by station slug.
+  // When the last successful load landed, for the stamp after a failed one.
+  let _loadedAt = null;
+  // One load at a time: Retry and Refresh cannot overlap a load in flight.
+  let _loading = false;
   async function loadAll() {
+    if (_loading) return;
+    _loading = true;
     try {
       // The maintenance feed is optional — the map still works as a station
       // map without it, so a failure there degrades to the banner rather than
@@ -695,7 +701,8 @@
       rebuildSource();
       applyAllFilters();   // re-apply now that activeNetworks is populated
       renderLegend();
-      refreshStamp(Date.now());
+      _loadedAt = Date.now();
+      refreshStamp(_loadedAt);
       // Deep-link from ?station=… in URL, on the FIRST load only: a manual
       // Refresh must not re-open a station the visitor has since closed.
       // loadAll() is only called from the map's 'load' handler (and
@@ -724,8 +731,12 @@
     } catch (err) {
       console.error(err);
       dataUnavailable = true;
-      setDataNotice(true);
-      MCO.showToast(`Error loading data: ${err.message}`);
+      // A failed Refresh keeps the stations it already had: a warning. With
+      // no stations to show it is an error.
+      if (stations.length) setDataNotice(true, 'Station data failed to load. Showing the last list loaded, without visit status.');
+      else setDataNotice(true, 'Station data failed to load.', 'danger');
+      if (_loadedAt) refreshStamp(_loadedAt);
+      else refreshStampEl.textContent = 'Data unavailable';
       // Still try to render whatever we have.
       indexStations();
       buildFilterUI();
@@ -735,22 +746,27 @@
       renderLegend();
       if (!_initStationConsumed) { _initStationConsumed = true; infoModalCtl.intro(); }
       MCO.ready();
+    } finally {
+      _loading = false;
     }
   }
   // Maintenance feed down or empty: a warning notice over the map, with
   // Retry (MCO.notice, kit 0.8.0 — tone word, icon, announcement, dismiss).
+  // The station list down shows the same notice with its own text.
   // The element keeps the id "data-banner": scripts/generate_preview.py
   // refuses to overwrite the social card while it is visible.
   let _dataNotice = null;
-  function setDataNotice(on) {
+  function setDataNotice(on, text = 'Maintenance data unavailable. Showing stations without visit status.', tone = 'warning') {
+    if (on && _dataNotice && _dataNotice.text !== text) setDataNotice(false);
     if (on && !_dataNotice) {
       _dataNotice = MCO.notice({
-        tone: 'warning',
-        text: 'Maintenance data unavailable. Showing stations without visit status.',
+        tone,
+        text,
         action: { label: 'Retry', onClick: () => refreshData() },
         container: mapContainerEl, place: 'over',
         onClose: () => { _dataNotice = null; },
       });
+      _dataNotice.text = text;
       if (_dataNotice.element) _dataNotice.element.id = 'data-banner';
     } else if (!on && _dataNotice) {
       const n = _dataNotice;
@@ -1435,7 +1451,7 @@
     const pill = STATE_PILL[complianceStateFor(s)] || STATE_PILL.overdue;
     const line = [pill.lbl];
     if (!dataUnavailable && m && m.last_qualifying_visit_date) {
-      line.push(`last Maint./Repair ${relDays(m.last_qualifying_visit_date)}`);
+      line.push(`Last Maintenance ${relDays(m.last_qualifying_visit_date)}`);
     }
     return { name: s.name || stationId, sub: s.station, line };
   }

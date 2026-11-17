@@ -131,7 +131,7 @@ export default {
         const t = document.getElementById('tooltip');
         return { vis: t.classList.contains('visible'), text: t.textContent, cursor: document.querySelector('.maplibregl-canvas').style.cursor };
       });
-      check('hovering a dot shows the tooltip (name, id, status) and a pointer', !!dot && tip.vis && /Visited this year/.test(tip.text) && tip.cursor === 'pointer', JSON.stringify(tip));
+      check('hovering a dot shows the tooltip (name, id, status) and a pointer', !!dot && tip.vis && /Visited this year/.test(tip.text) && /Last Maintenance/.test(tip.text) && tip.cursor === 'pointer', JSON.stringify(tip));
       const probs = await problems();
       check('no console / CSP problems on load', probs.length === 0, probs.slice(0, 3).join(' | '));
       // A theme flip calls setStyle, which wipes custom layers: they must
@@ -184,6 +184,25 @@ export default {
         const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
         check(`#data-banner axe-clean in ${theme}`, bad.length === 0, bad.map((v) => v.id).join(','));
       }
+      await ctx.close();
+    }
+    // Station list down: the notice says so and the stamp does not stay on
+    // "loading…"; Retry loads the list and clears the notice. Chromium only,
+    // for the same reason.
+    if (env.engine === 'chromium') {
+      const ctx = await env.browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'America/Denver' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('mco-maint-seen-intro', '1'); } catch {} });
+      let n = 0;
+      await ctx.route(/\/api\/v2\/stations\/\?type=json/, (r) => (n++ ? r.continue() : r.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: 'stub' })));
+      const page = await ctx.newPage();
+      await page.goto(env.base);
+      await page.waitForSelector('#data-banner', { timeout: 45000 }).catch(() => {});
+      const st = await page.evaluate(() => ({ text: document.querySelector('#data-banner .mco-notice-text')?.textContent || '', toast: document.querySelector('.mco-toast')?.textContent || '', stamp: document.getElementById('refresh-stamp').textContent }));
+      check('station list down: error notice "Station data failed to load.", no toast, stamp "Data unavailable"', st.text === 'Error Station data failed to load.' && !st.toast && st.stamp === 'Data unavailable', JSON.stringify(st));
+      await page.click('#data-banner button:text("Retry")').catch(() => {});
+      await page.waitForFunction(dataReady, null, { timeout: 45000 }).catch(() => {});
+      const re = await page.evaluate(() => ({ rows: document.querySelectorAll('#sr-station-table tbody tr').length, banner: !!document.getElementById('data-banner'), stamp: document.getElementById('refresh-stamp').textContent }));
+      check('station list down: Retry loads the list and clears the notice', re.rows > 100 && !re.banner && /^Updated /.test(re.stamp), JSON.stringify(re));
       await ctx.close();
     }
     // Theme toggle cycles dark -> light -> high contrast -> dark, naming the
@@ -581,6 +600,19 @@ export default {
       check(`${vp.name}: closing the deep-linked sheet drops ?station=, and Refresh does not re-open it`,
         closed.st === 'closed' && !/station=/.test(closed.q) && after.st === 'closed' && !/station=/.test(after.q) && /^Updated .* M[SD]T$/.test(after.stamp),
         JSON.stringify({ closed, after }));
+      await close();
+    }
+    // A phone keyboard turns 390x844 into a short landscape viewport. While
+    // the search field has focus the kit holds the folded bar, and the bar's
+    // mode select must stay with it.
+    {
+      const { page, close } = await open('', { ready: dataReady, viewport: { name: '390', width: 390, height: 844, touch: true } });
+      await page.click('#btn-rail-search');
+      await page.waitForTimeout(500);
+      await page.setViewportSize({ width: 390, height: 374 });
+      await page.waitForTimeout(800);
+      const k = await page.evaluate(() => ({ hold: document.documentElement.classList.contains('mco-bar-hold'), active: document.activeElement?.id, select: getComputedStyle(document.getElementById('rail-mode-select')).display }));
+      check('390 keyboard up while typing: the held bar keeps its mode select', k.hold && k.active === 'search-input' && k.select !== 'none', JSON.stringify(k));
       await close();
     }
     // 390: the one-row phone bar (badge left, mode select, search, ☰ right),

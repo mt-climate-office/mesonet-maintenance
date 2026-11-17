@@ -353,9 +353,10 @@
     /* The rail's mode select is the compact bar's hot control. In the
        short-landscape rail (a 56px column at the right edge,
        MCO.viewport.RAIL_MQ) a select can't fit, so it hides there and the
-       drawer's select stays the way in (MIGRATING 0.21.2 → 1.0.0, step 3). */
+       drawer's select stays the way in (MIGRATING 0.21.2 → 1.0.0, step 3).
+       Not while html.mco-bar-hold keeps the folded bar for someone typing. */
     @media (max-height: 560px) and (orientation: landscape) {
-      #rail-mode-select { display: none; }
+      html:not(.mco-bar-hold) #rail-mode-select { display: none; }
     }
     /* WCAG 2.5.5 — comfortable touch targets on touch-only devices. The kit
        already sizes .nav-btn, .seg-btn, .mco-btn-info and .mco-panel-toggle;
