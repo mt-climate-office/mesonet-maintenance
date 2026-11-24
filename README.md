@@ -15,8 +15,8 @@ There is no build step. The page calls the API cross-origin, so no backend is ne
 ## Deploy
 
 Pushing `main` deploys. GitHub Pages serves the repo root, proxied at `mesonet.climate.umt.edu/maintenance/`.
-A nightly workflow commits `assets/og-card.png` to `main`, so pull before you push.
-`scripts/generate_preview.py` reads `#refresh-stamp`, `#data-banner` and the `mco-maint-seen-intro` key. Keep those names.
+`.github/workflows/pages.yml` deploys it and refreshes the social card (`assets/og-card.jpg`) every 6 hours.
+The card reads `#refresh-stamp`, `#data-banner` and the `mco-maint-seen-intro` key. Keep those names.
 
 ## URL parameters
 
