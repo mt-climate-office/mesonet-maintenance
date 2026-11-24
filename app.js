@@ -194,7 +194,7 @@
   // marked seen as it opens, never over a deep link (a visitor sent to one
   // station came for that station) and never once focus has moved. Deferred
   // until the first data load, so the map is drawn behind it.
-  // scripts/generate_preview.py seeds this key to keep the card clear.
+  // The social card workflow (pages.yml) seeds this key to keep the card clear.
   const btnInfo = document.getElementById('btn-info');
   const _bootParams = MCO.urlParams();
   const _isDeepLink = ['station', 'lng', 'lat', 'zoom']
@@ -252,7 +252,7 @@
   // time whatever the viewer's zone, with the date when it isn't today in
   // Montana. The maintenance feed is a live AirTable read that carries no
   // data timestamp, so the time is when the load landed (HOUSE-STYLE §4).
-  // scripts/generate_preview.py waits for this text ("^Updated").
+  // The social card workflow (pages.yml) waits for this text ("^Updated").
   function refreshStamp(ms) {
     MCO.formatUpdatedMT(ms, { into: refreshStampEl });
   }
@@ -753,7 +753,7 @@
   // Maintenance feed down or empty: a warning notice over the map, with
   // Retry (MCO.notice, kit 0.8.0 — tone word, icon, announcement, dismiss).
   // The station list down shows the same notice with its own text.
-  // The element keeps the id "data-banner": scripts/generate_preview.py
+  // The element keeps the id "data-banner": the card workflow (pages.yml)
   // refuses to overwrite the social card while it is visible.
   let _dataNotice = null;
   function setDataNotice(on, text = 'Maintenance data unavailable. Showing stations without visit status.', tone = 'warning') {
